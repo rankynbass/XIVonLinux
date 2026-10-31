@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/lib/" />
+  <Folder Name="/lib/FFXIVQuickLauncher/" />
+  <Folder Name="/lib/FFXIVQuickLauncher/src/">
+    <Project Path="lib/FFXIVQuickLauncher/src/XIVLauncher.Aria/XIVLauncher.Aria.csproj" />
+    <Project Path="lib/FFXIVQuickLauncher/src/XIVLauncher.Common/XIVLauncher.Common.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/XIVLauncher.Core.Linux/XIVLauncher.Core.Linux.csproj" />
+  </Folder>
+</Solution>
