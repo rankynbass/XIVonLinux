@@ -8,7 +8,8 @@
     <StackPanel Margin="24">
         <TextBlock Text="XIVonLinux" FontSize="28" FontWeight="Bold" />
         <TextBlock Text="Linux-native FFXIV launcher (Proton/umu + in-prefix Windows Dalamud)" Opacity="0.7" Margin="0,6,0,18" />
-        <Button Content="Dummy launch (fake login spike)" Name="FakeLaunchButton" HorizontalAlignment="Left" Click="OnFakeLaunch" />
-        <TextBlock Name="StatusText" Margin="0,18,0,0" Opacity="0.8" Text="" />
+        <Button Content="Launch game (fake login, Steam)" Name="LaunchButton" HorizontalAlignment="Left" Click="OnLaunch" />
+        <TextBox Name="StatusLog" Margin="0,18,0,0" IsReadOnly="True" TextWrapping="Wrap"
+                 AcceptsReturn="True" Height="300" />
     </StackPanel>
 </Window>

@@ -20,8 +20,10 @@ public sealed class LinuxSteamStub : ISteam
 
     public Task<byte[]?> GetAuthSessionTicketAsync() => Task.FromResult<byte[]?>(null);
 
-    public bool IsAppInstalled(uint appId) => false;
-    public string GetAppInstallDir(uint appId) => string.Empty;
+    public bool IsAppInstalled(uint appId) => appId == SteamInstall.XivAppId && SteamInstall.Detect() is not null;
+
+    public string GetAppInstallDir(uint appId) =>
+        appId == SteamInstall.XivAppId ? SteamInstall.Detect()?.GamePath.FullName ?? string.Empty : string.Empty;
 
     public bool ShowGamepadTextInput(bool password, bool multiline, string description, int maxChars, string existingText = "") => false;
     public string GetEnteredGamepadText() => string.Empty;

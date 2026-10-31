@@ -45,9 +45,12 @@ public sealed class UmuPrefix
     /// </summary>
     public Dictionary<string, string> UmuEnvironment()
     {
+        // GE/Proton convention (Milestone-1 verified command): WINEPREFIX is the compatdata
+        // ROOT; the proton script appends pfx/ and the prefix lands at <compatdata>/pfx.
+        // PrefixDir is that <compatdata>/pfx dir, used for dosdevices path translation.
         var env = new Dictionary<string, string>
         {
-            { "WINEPREFIX", PrefixDir.FullName },
+            { "WINEPREFIX", SteamCompatDataPath },
             { "GAMEID", GameId },
             { "STEAM_COMPAT_DATA_PATH", SteamCompatDataPath },
             { "STEAM_COMPAT_INSTALL_PATH", SteamCompatInstallPath },

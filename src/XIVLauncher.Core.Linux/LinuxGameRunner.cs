@@ -30,6 +30,11 @@ public sealed class LinuxGameRunner : IGameRunner
         var gameExeWine = prefix.UnixToWinePath(path);
 
         var args = new List<string>();
+
+        // umu-run's first positional arg is the in-prefix executable; it must be the
+        // Wine-style path (a unix path makes the launch silent). Then the game args.
+        args.Add(gameExeWine);
+
         foreach (var a in arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries))
             args.Add(a);
 

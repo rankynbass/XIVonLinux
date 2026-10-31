@@ -44,12 +44,39 @@ public sealed class UmuCommandRunner
 
     /// <summary>
     /// Create a prefix with the current (auto-selected or PROTONPATH) Proton build:
-    /// `umu-run ""` with the prefix env — verified in Milestone 1.
+    /// `umu-run ""` with the prefix env — verified in Milestone 1. Runs from the compatdata
+    /// root (drive_c does not exist yet, so PrefixWorkDir() would fail Process.Start).
+    /// umu prints "ShellExecuteEx failed: File not found" and exits 0 — harmless.
     /// </summary>
     public Process CreatePrefix()
     {
         var psi = new ProcessStartInfo(UmuRunPath) { Arguments = "\"\"" };
-        return Run(psi, "", null, false, true);
+        return Run(psi, prefix.SteamCompatDataPath, null, false, true);
+    }
+
+    /// <summary>
+    /// Ensure the prefix exists and is bootstrapped. Prefix creation is `umu-run ""`;
+    /// the bootstrap `umu-run cmd /c dir %userprofile%/Documents > nul` initializes the
+    /// user profile/Steam bits (upstream CompatibilityTools.EnsurePrefix shape) — plain
+    /// launches without it destabilize game boot (error dialogs at boot).
+    /// GE init markers (config_info, version, tracked_files) live at the compatdata root.
+    /// </summary>
+    public void EnsurePrefix()
+    {
+        Directory.CreateDirectory(prefix.SteamCompatDataPath);
+
+        var created = File.Exists(Path.Combine(prefix.SteamCompatDataPath, "config_info"))
+                      && Directory.Exists(Path.Combine(prefix.PrefixDir.FullName, "dosdevices"));
+
+        Log.Information("Prefix {Prefix} at {Root}: {State}", prefix.PrefixDir.FullName,
+            prefix.SteamCompatDataPath, created ? "created" : "missing");
+
+        if (!created)
+            CreatePrefix().WaitForExit();
+
+        var bootstrap = RunInPrefix(new[] { "cmd", "/c", "dir %userprofile%/Documents > nul" },
+            "", null, false, true);
+        bootstrap.WaitForExit();
     }
 
     /// <summary>Run winetricks verbs inside the prefix (GE/UMU-Proton support).</summary>

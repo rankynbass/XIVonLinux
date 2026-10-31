@@ -20,6 +20,12 @@
         <PackageReference Include="Avalonia" Version="12.1.4" />
         <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
         <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+        <!-- Pinned to the versions in lib/FFXIVQuickLauncher/src/Directory.Packages.props
+             (central package management); projects outside lib/src must pin explicit matching
+             versions, NU1605 downgrade-as-error otherwise. -->
+        <PackageReference Include="Serilog" Version="4.2.0" />
+        <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+        <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
     </ItemGroup>
 
 </Project>
