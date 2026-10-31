@@ -1,0 +1,5 @@
+# Spike/scratch areas — Proton prefixes, downloads, build output
+spike/
+bin/
+obj/
+*.log
