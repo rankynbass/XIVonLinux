@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <AssemblyName>XIVonLinux</AssemblyName>
+        <Product>XIVonLinux Launcher</Product>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+        <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+        <ApplicationManifest>app.manifest</ApplicationManifest>
+        <AvaloniaUseNamedShadowsInInlinedXaml>true</AvaloniaUseNamedShadowsInInlinedXaml>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\XIVLauncher.Core.Linux\XIVLauncher.Core.Linux.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Avalonia" Version="12.1.4" />
+        <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    </ItemGroup>
+
+</Project>

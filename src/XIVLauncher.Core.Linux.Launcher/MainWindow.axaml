@@ -1,0 +1,14 @@
+<Window
+    x:Class="XIVonLinux.Launcher.MainWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Width="760"
+    Height="520"
+    Title="XIVonLinux">
+    <StackPanel Margin="24">
+        <TextBlock Text="XIVonLinux" FontSize="28" FontWeight="Bold" />
+        <TextBlock Text="Linux-native FFXIV launcher (Proton/umu + in-prefix Windows Dalamud)" Opacity="0.7" Margin="0,6,0,18" />
+        <Button Content="Dummy launch (fake login spike)" Name="FakeLaunchButton" HorizontalAlignment="Left" Click="OnFakeLaunch" />
+        <TextBlock Name="StatusText" Margin="0,18,0,0" Opacity="0.8" Text="" />
+    </StackPanel>
+</Window>

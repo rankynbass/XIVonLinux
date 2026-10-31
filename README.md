@@ -10,7 +10,7 @@ A Linux-native FFXIV launcher targeting the Linux desktop and Steam Deck.
 
 ## Key components (planned)
 
-- Launcher UI (TBD: Eto.Forms vs GTK — see XIVLauncher.Core experience on Linux).
+- Launcher UI: **Avalonia** (XAML, X11/Wayland native, dark mode, Steam Deck touch). Eto.Forms (XIVLauncher.Core's stack) rejected as primary: its Linux backend has layout/DPI/dark-mode problems (see XIVLauncher.Core experience); it remains the port-source reference for screens.
 - Game acquisition / patching (game files, module files, boot).
 - Proton prefix management via umu-launcher.
 - Dalamud injection path for Proton prefixes.
