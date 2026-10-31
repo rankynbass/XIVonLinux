@@ -27,14 +27,19 @@ public sealed class UmuPrefix
     /// <summary>Optional PROTONPATH override; umu auto-selects latest UMU-Proton when null.</summary>
     public string? ProtonPath { get; }
 
+    /// <summary>Optional STEAM_COMPAT_MOUNTS — directories bind-mounted into the prefix by
+    /// the Steam/compat launch convention (space-free paths, see SteamLocator).</summary>
+    public string? SteamCompatMounts { get; }
+
     public UmuPrefix(DirectoryInfo prefixDir, string steamCompatDataPath, string steamCompatInstallPath,
-        string gameId = "umu-steam", string? protonPath = null)
+        string gameId = "umu-steam", string? protonPath = null, string? steamCompatMounts = null)
     {
         PrefixDir = prefixDir;
         SteamCompatDataPath = steamCompatDataPath;
         SteamCompatInstallPath = steamCompatInstallPath;
         GameId = gameId;
         ProtonPath = protonPath;
+        SteamCompatMounts = steamCompatMounts;
     }
 
     public bool Exists => PrefixDir.Exists;
@@ -57,6 +62,8 @@ public sealed class UmuPrefix
         };
         if (!string.IsNullOrEmpty(ProtonPath))
             env["PROTONPATH"] = ProtonPath;
+        if (!string.IsNullOrEmpty(SteamCompatMounts))
+            env["STEAM_COMPAT_MOUNTS"] = SteamCompatMounts;
         return env;
     }
 
@@ -76,6 +83,28 @@ public sealed class UmuPrefix
         var root = best.Value.TrimEnd('/');
         var rest = unixPath.Substring(root.Length).TrimStart('/').Replace('/', '\\');
         return rest.Length > 0 ? $"{best.Key}:\\{rest}" : $"{best.Key}:\\";
+    }
+
+    /// <summary>
+    /// Translate a unix path to a Wine path rooted at the prefix's z: drive (z: -> unix /).
+    /// Wine-rooted (z:\home\...) segments are absolute for .NET path APIs, so Path.Join with
+    /// them returns the rooted segment; x:-style paths (x:\.local\...) are drive-relative
+    /// and concatenate, which breaks the injector's Path.Join(workingDir, ver) reads.
+    /// </summary>
+    public string UnixToWineRootPath(string unixPath)
+    {
+        var drives = GetDriveSymlinks();
+        if (drives.TryGetValue("z", out var unixRoot))
+        {
+            var root = unixRoot.TrimEnd('/');
+            if (unixPath == root || unixPath.StartsWith(root + "/"))
+            {
+                var rest = unixPath.Substring(root.Length).TrimStart('/').Replace('/', '\\');
+                return rest.Length > 0 ? $"z:\\{rest}" : "z:\\";
+            }
+        }
+
+        return UnixToWinePath(unixPath);
     }
 
     private Dictionary<string, string> GetDriveSymlinks()

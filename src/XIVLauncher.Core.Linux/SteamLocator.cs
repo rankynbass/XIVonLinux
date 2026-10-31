@@ -38,10 +38,15 @@ public sealed class SteamInstall
             return null;
 
         var gameDir = new DirectoryInfo(Path.Combine(root, "steamapps", "common", installDir));
-        if (!File.Exists(Path.Combine(gameDir.FullName, "game", "ffxiv_dx11.exe")))
+        // Steam's common dir is commonly a symlink to the real game dir (e.g.
+        // /games/final-fantasy-xiv/ffxiv). Resolve it: the symlinked name carries spaces
+        // ("FINAL FANTASY XIV Online"), and umu's shell-joining quotes args with spaces —
+        // the literal quote chars land inside the injector's --game path ("Invalid name").
+        var resolved = gameDir.ResolveLinkTarget(true) as DirectoryInfo ?? gameDir;
+        if (!File.Exists(Path.Combine(resolved.FullName, "game", "ffxiv_dx11.exe")))
             return null;
 
-        return new SteamInstall(gameDir, root);
+        return new SteamInstall(resolved, root);
     }
 
     private static string? FindSteamRoot()
