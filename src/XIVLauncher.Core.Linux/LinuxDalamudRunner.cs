@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using Serilog;
 using XIVLauncher.Common;
 using XIVLauncher.Common.Dalamud;
 using XIVLauncher.Common.PlatformAbstractions;
@@ -96,10 +97,11 @@ public sealed class LinuxDalamudRunner : IDalamudRunner
         _ = Task.Run(() => capturedUmuError = proc.StandardError.ReadToEnd());
 
         jsonFound.Wait(TimeSpan.FromSeconds(180));
-        if (result?.WinProcessId is null)
+        var winePid = result?.WinProcessId ?? result?.Pid;
+        if (winePid is null)
             return null;
 
-        return MapWinePidToGameProcess(result.WinProcessId.Value, proc);
+        return MapWinePidToGameProcess(winePid.Value, proc);
     }
 
     private static string? ExtractLastJsonObject(string output)
@@ -161,32 +163,32 @@ public sealed class LinuxDalamudRunner : IDalamudRunner
 
     private Process? MapWinePidToGameProcess(int winePid, Process injectorProc)
     {
-        // winedbg wine_pid -> unix_pid. XIV-Proton builds answer 'info proc'; GE/UMU winedbg
-        // crashes on it (Exception c0000005), so the comm-match fallback below is mandatory.
-        var winedbg = runner.RunInPrefix(new List<string> { "winedbg", "--command", "info proc" }, "", null, true, false);
-        winedbg.WaitForExit();
-        var outp = winedbg.StandardOutput.ReadToEnd();
-        var lines = outp.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-        foreach (var l in lines)
+        // winedbg is dropped: GE/UMU winedbg hangs on `info proc` (winedbg.WaitForExit()
+        // never completes), so the comm-match below is the sole mapping path.
+        var candidates = Process.GetProcessesByName(gameExeName);
+        Log.Information("comm-match '{Name}': {N} candidates", gameExeName, candidates.Length);
+
+        Process? best = null;
+        DateTime bestStart = default;
+        foreach (var p in candidates)
         {
-            var sp = l.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (sp.Length == 2 && int.TryParse(sp[0], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var w) &&
-                int.TryParse(sp[1], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u) && w == winePid)
+            try
             {
-                return Process.GetProcessById(u);
+                var st = p.StartTime;
+                Log.Information("  pid {P} start {S}", p.Id, st);
+                if (best is null || st > bestStart)
+                {
+                    bestStart = st;
+                    best = p;
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Information("  pid {P} start time unavailable: {E}", p.Id, e.Message);
             }
         }
 
-        // Fallback (GE/UMU): on GE-Proton the unix comm equals the Windows exe name
-        // (comm=ffxiv_dx11.exe); the game is spawned as a child of the injector's umu chain,
-        // so the game unix PID is > injector PID.
-        foreach (var p in Process.GetProcessesByName(gameExeName))
-        {
-            if (p.Id > injectorProc.Id)
-                return p;
-        }
-
-        return null;
+        return best;
     }
 
     private sealed class DalamudInjectorResult
@@ -194,7 +196,13 @@ public sealed class LinuxDalamudRunner : IDalamudRunner
         [JsonProperty("startup_info")]
         public DalamudStartInfo? StartupInfo { get; set; }
 
+        // The in-prefix injector (LINUX platform path) prints {"pid": N, "handle": 0} —
+        // the Windows launcher shape uses process_id. Both spellings accepted; pid is
+        // the Wine process id, which MapWinePidToGameProcess resolves to the unix game pid.
         [JsonProperty("process_id")]
         public int? WinProcessId { get; set; }
+
+        [JsonProperty("pid")]
+        public int? Pid { get; set; }
     }
 }

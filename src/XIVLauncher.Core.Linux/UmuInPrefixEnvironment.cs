@@ -29,6 +29,9 @@ public sealed class UmuInPrefixEnvironment
         var env = new Dictionary<string, string>();
         foreach (var (key, winePath) in vars)
             env[key] = winePath;
+
+        // Tell GE-Proton/umu to run the command inside the prefix (not as a game launch).
+        env["PROTON_VERB"] = "runinprefix";
         return env;
     }
 }
