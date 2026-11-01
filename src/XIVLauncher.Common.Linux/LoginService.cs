@@ -66,12 +66,91 @@ public sealed class LoginService : IDisposable
     /// failure. Username is the SE/Steam account name; Steam login ignores
     /// password/OTP. Credentials are passed in-memory and never persisted.
     /// </summary>
-    public async Task<Launcher.LoginResult> LoginAsync(LaunchSettings settings, DirectoryInfo gamePath)
+    /// <summary>
+    /// Fresh-install game folder rule: a missing game directory is created, but only
+    /// ONE level deep — its immediate parent must already exist. If the parent is
+    /// missing too, this returns the error naming it (no recursive tree creation).
+    /// Returns null when the directory exists (or was created).
+    /// </summary>
+    public static string? EnsureGameDir(string gamePathFull)
+    {
+        var dir = new DirectoryInfo(gamePathFull);
+        if (dir.Exists)
+            return null;
+
+        var parent = dir.Parent;
+        if (parent is null || !parent.Exists)
+            return $"{(parent?.FullName ?? dir.Root.FullName)} does not exist — cannot create the game directory {dir.FullName}";
+
+        Directory.CreateDirectory(dir.FullName);
+        return null;
+    }
+
+    public async Task<Launcher.LoginResult> LoginAsync(LaunchSettings settings, DirectoryInfo gamePath, bool forceBaseVersion = false)
     {
         return await launcher.Login(
             settings.Username, settings.Password, settings.OneTimePassword,
-            settings.SteamAccount, useCache: false, gamePath, forceBaseVersion: false,
+            settings.SteamAccount, useCache: false, gamePath, forceBaseVersion,
             settings.FreeTrial, language);
+    }
+
+    /// <summary>Boot patch list for an (empty) install: CheckBootVersion with
+    /// forceBaseVersion=true — missing boot ver file reports base ver, so the server
+    /// answers with every boot patch from base to latest. No boot hashes involved.</summary>
+    public async Task<PatchListEntry[]> CheckBootPatchesAsync(DirectoryInfo gamePath)
+    {
+        return await launcher.CheckBootVersion(gamePath, forceBaseVersion: true);
+    }
+
+    /// <summary>
+    /// Download and install a patch list into the game folder: aria2 RPC acquisition
+    /// into the patch store (~/.xivonlinux/patches), in-process RemotePatchInstaller
+    /// writing repo files (boot/ or game/) into gamePath, per-block SHA1 verification
+    /// by PatchManager. status receives progress lines. Repository.Boot drives the
+    /// boot dir, Repository.Ffxiv the game dir; uid is the patch unique id ("" for boot).
+    /// </summary>
+    public async Task<bool> InstallPatchesAsync(Repository repo, PatchListEntry[] patches, string uid, LaunchSettings settings, Action<string> status)
+    {
+        var gamePath = new DirectoryInfo(settings.GameLocation);
+        var patchStore = new DirectoryInfo(settings.PatchFolder);
+        Directory.CreateDirectory(patchStore.FullName);
+
+        var logFile = settingsService.GetFile("aria2.log");
+
+        if (acquisition is null)
+        {
+            acquisition = new AriaPatchAcquisition(logFile);
+            await acquisition.StartIfNeededAsync(0); // no speed limit
+        }
+
+        var installer = new PatchInstaller(gamePath, keepPatches: false);
+        installer.StartIfNeeded(false); // in-process RemotePatchInstaller, no external patcher exe
+        installer.OnFail += () => status("patch installer failed");
+
+        var patcher = new PatchManager(acquisition, 0, repo, patches,
+            gamePath, patchStore, installer, launcher, uid);
+
+        var total = patcher.Downloads.Count;
+        status($"{repo}: {total} patches to download/install");
+
+        var done = await patcher.PatchAsync(false);
+
+        var speed = 0d;
+        foreach (var s in patcher.Speeds) speed += s;
+        status($"{repo} done: {(done ? "ok" : "FAILED")}, {total} patches, last speed {speed / 1024 / 1024:0.0} MB/s");
+
+        return done;
+    }
+
+    /// <summary>
+    /// Download and install the pending game patches for a NeedsPatchGame LoginResult
+    /// (Aria2 RPC acquisition in ~/.xivonlinux/patches, in-process installer writing
+    /// into the game folder). status receives human-readable progress lines.
+    /// </summary>
+    public async Task<bool> PatchAsync(Launcher.LoginResult loginResult, LaunchSettings settings, Action<string> status)
+    {
+        return await InstallPatchesAsync(Repository.Ffxiv, loginResult.PendingPatches,
+            loginResult.UniqueId ?? string.Empty, settings, status);
     }
 
     /// <summary>
@@ -247,41 +326,6 @@ public sealed class LoginService : IDisposable
         foreach (var b in hash) sb.Append(b.ToString("x2"));
         // GetFileHash shape: length + "/" + sha1hex
         return new FileInfo(file).Length + "/" + sb.ToString();
-    }
-
-    /// <summary>
-    /// Download and install the pending game patches for a NeedsPatchGame LoginResult
-    /// (Aria2 RPC acquisition in ~/.xivonlinux/patches, in-process installer writing
-    /// into the game folder). status receives human-readable progress lines.
-    /// </summary>
-    public async Task<bool> PatchAsync(Launcher.LoginResult loginResult, LaunchSettings settings, Action<string> status)
-    {
-        var gamePath = new DirectoryInfo(settings.GameLocation);
-        var patchStore = new DirectoryInfo(settings.PatchFolder);
-        Directory.CreateDirectory(patchStore.FullName);
-
-        var logFile = settingsService.GetFile("aria2.log");
-
-        acquisition = new AriaPatchAcquisition(logFile);
-        await acquisition.StartIfNeededAsync(0); // no speed limit
-
-        var installer = new PatchInstaller(gamePath, keepPatches: false);
-        installer.StartIfNeeded(false); // in-process RemotePatchInstaller, no external patcher exe
-        installer.OnFail += () => status("patch installer failed");
-
-        var patcher = new PatchManager(acquisition, 0, Repository.Ffxiv, loginResult.PendingPatches,
-            gamePath, patchStore, installer, launcher, loginResult.UniqueId ?? string.Empty);
-
-        var total = patcher.Downloads.Count;
-        status($"Patching: {total} patches to download");
-
-        var done = await patcher.PatchAsync(false);
-
-        var speed = 0d;
-        foreach (var s in patcher.Speeds) speed += s;
-        status($"Patching done: {done}, {total} patches, last speed {speed / 1024 / 1024:0.0} MB/s");
-
-        return done;
     }
 
     /// <summary>

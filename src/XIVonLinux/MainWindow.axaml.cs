@@ -3,7 +3,9 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Serilog;
@@ -139,6 +141,63 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// Popup warning: the game is not installed at the Game location and a full
+    /// download will run first, with Continue and Cancel buttons. Shown on the UI
+    /// thread (the pipeline runs on a background task), result delivered via TCS.
+    /// </summary>
+    private async Task<bool> ShowInstallConfirmAsync(string gamePathFull)
+    {
+        var tcs = new TaskCompletionSource<bool>();
+
+        var dialog = await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            var msg = new TextBlock
+            {
+                Text = $"The game is not installed at:\n{gamePathFull}\n\nThe game will be downloaded first (boot + game patches from base, tens of GB). This can take a long time. Do you want to continue?",
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(16, 16, 16, 12),
+            };
+
+            var continueButton = new Button { Content = "Continue", Padding = new Thickness(16, 6), Margin = new Thickness(0, 0, 8, 0) };
+            var cancelButton = new Button { Content = "Cancel", Padding = new Thickness(16, 6) };
+
+            var row = new DockPanel
+            {
+                LastChildFill = false,
+                Margin = new Thickness(16, 0, 16, 16),
+            };
+            DockPanel.SetDock(continueButton, Dock.Right);
+            DockPanel.SetDock(cancelButton, Dock.Right);
+            row.Children.Add(cancelButton);
+            row.Children.Add(continueButton);
+
+            var panel = new StackPanel();
+            panel.Children.Add(msg);
+            panel.Children.Add(row);
+
+            var window = new Window
+            {
+                Title = "Game not installed",
+                Content = panel,
+                Width = 460,
+                Height = 230,
+                CanResize = false,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            };
+
+            continueButton.Click += (_, __) => { tcs.TrySetResult(true); Dispatcher.UIThread.Post(() => window.Close()); };
+            cancelButton.Click += (_, __) => { tcs.TrySetResult(false); Dispatcher.UIThread.Post(() => window.Close()); };
+
+            window.Show(this);
+            return window;
+        });
+
+        var cont = await tcs.Task;
+        Dispatcher.UIThread.Post(() => dialog.Close());
+        return cont;
+    }
+
+    /// <summary>
     /// Milestone 4 pipeline: settings -> prefix ensure (create + bootstrap) -> gate check
     /// -> real SE login (OauthLogin + RegisterSession) -> game patching when the server
     /// returns a patch list -> launch with the encrypted login session args, via the
@@ -162,12 +221,14 @@ public partial class MainWindow : Window
 
             var gamePath = new DirectoryInfo(s.GameLocation);
             var gameExe = new FileInfo(Path.Combine(gamePath.FullName, "game", "ffxiv_dx11.exe"));
-            if (!File.Exists(gameExe.FullName))
+            var gameInstalled = File.Exists(gameExe.FullName);
+            Report($"Game location: {gamePath.FullName}");
+
+            if (!gameInstalled && downloadTest)
             {
-                Report($"Game exe not found: {gameExe.FullName} — pick the game folder containing game/ffxiv_dx11.exe.");
+                Report($"Game exe not found: {gameExe.FullName} — the download test needs an installed game (version + boot files to report).");
                 return;
             }
-            Report($"Game location: {gamePath.FullName}");
 
             var proton = s.ProtonPath;
             if (string.IsNullOrEmpty(proton) || !Directory.Exists(proton))
@@ -199,6 +260,71 @@ public partial class MainWindow : Window
             if (!await service.GateAvailableAsync())
             {
                 Report("Login servers unreachable or maintenance in progress.");
+                return;
+            }
+
+            if (!gameInstalled)
+            {
+                // Missing game folder: create it, but only one level — the immediate
+                // parent must exist (e.g. ~/Games/final-fantasy-xiv is creatable when
+                // ~/Games exists; a missing ~/Games fails with a clear message).
+                var dirErr = LoginService.EnsureGameDir(gamePath.FullName);
+                if (dirErr is not null)
+                {
+                    Report(dirErr);
+                    return;
+                }
+
+                // Full fresh install from an empty game dir. Upstream fresh-install shape
+                // (MainPage.cs CheckBootVersion → TryHandlePatchAsync(Repository.Boot)):
+                // 1) boot patches from base (missing boot ver file reports base ver, no
+                //    boot hashes), installed into boot/;
+                // 2) login with forceBaseVersion=true — the base version report makes the
+                //    server return the FULL game patch list (base → latest);
+                // 3) install every game patch into the game dir; then launch with the
+                //    login session, game exe exists now.
+                Report($"Game is not installed at {gamePath.FullName} — the full game (boot + game patches, tens of GB) will be downloaded and installed first.");
+                var cont = await ShowInstallConfirmAsync(gamePath.FullName);
+                if (!cont)
+                {
+                    Report("Install cancelled — nothing downloaded.");
+                    return;
+                }
+
+                Report("Install step 1: boot patch list from base ...");
+                var bootPatches = await service.CheckBootPatchesAsync(gamePath);
+                Report($"Boot patch list: {bootPatches.Length} entries");
+                if (bootPatches.Length > 0)
+                {
+                    var okBoot = await service.InstallPatchesAsync(Repository.Boot, bootPatches, string.Empty, s, Report);
+                    if (!okBoot)
+                    {
+                        Report("Boot install failed — game not installed.");
+                        return;
+                    }
+                }
+
+                Report($"Install step 2: login with base game version report (steam: {s.SteamAccount}, free trial: {s.FreeTrial})");
+                var installResult = await service.LoginAsync(s, gamePath, forceBaseVersion: true);
+                Report($"Install login state: {installResult.State}");
+                if (installResult.State != XivGame.LoginState.NeedsPatchGame)
+                {
+                    Report($"Unexpected login state {installResult.State} during install (expected NeedsPatchGame).");
+                    return;
+                }
+
+                var okAll = await service.InstallPatchesAsync(Repository.Ffxiv, installResult.PendingPatches, installResult.UniqueId ?? string.Empty, s, Report);
+                if (!okAll)
+                {
+                    Report("Game patch install failed — game not installed.");
+                    return;
+                }
+
+                Report($"Install complete: game ver {Repository.Ffxiv.GetVer(gamePath)}");
+                if (withDalamud)
+                    LaunchWithDansharing(prefix, service, gameExe, gamePath, installResult, lang);
+                else
+                    LaunchPlain(prefix, service, gamePath, installResult, lang, s.SteamAccount);
                 return;
             }
 
