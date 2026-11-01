@@ -29,15 +29,18 @@
         </Grid>
 
         <!-- Credentials -->
-        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto">
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">
             <TextBlock Grid.Row="0" Grid.Column="0" Text="Username" VerticalAlignment="Center" Margin="0,0,12,6" />
             <TextBox Grid.Row="0" Grid.Column="1" Name="UsernameBox" Margin="0,0,0,6" />
 
             <TextBlock Grid.Row="1" Grid.Column="0" Text="Password" VerticalAlignment="Center" Margin="0,0,12,6" />
             <TextBox Grid.Row="1" Grid.Column="1" Name="PasswordBox" PasswordChar="*" Margin="0,0,0,6" />
 
-            <TextBlock Grid.Row="2" Grid.Column="0" Text="OTP" VerticalAlignment="Center" Margin="0,0,12,0" />
-            <TextBox Grid.Row="2" Grid.Column="1" Name="OtpBox" Margin="0,0,0,0" />
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="OTP" VerticalAlignment="Center" Margin="0,0,12,6" />
+            <TextBox Grid.Row="2" Grid.Column="1" Name="OtpBox" Margin="0,0,0,6" />
+
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="Language" VerticalAlignment="Center" Margin="0,0,12,0" />
+            <ComboBox Grid.Row="3" Grid.Column="1" Name="LanguageCombo" Margin="0,0,0,0" />
         </Grid>
 
         <!-- Toggles -->

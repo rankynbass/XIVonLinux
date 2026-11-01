@@ -38,7 +38,19 @@ public partial class MainWindow : Window
         SteamAccountToggle.IsChecked = s.SteamAccount;
         FreeTrialToggle.IsChecked = s.FreeTrial;
         DalamudToggle.IsChecked = s.DalamudEnabled;
+
+        // Client language selector: persisted setting, drives the encrypted launch args
+        // (language=N), the gate login region, and Dalamud's Language field.
+        foreach (var l in new[] { "English", "Japanese", "German", "French" })
+            LanguageCombo.Items.Add(l);
+        LanguageCombo.SelectedItem = s.Language;
+        if (LanguageCombo.SelectedItem is null)
+            LanguageCombo.SelectedIndex = 0;
     }
+
+    /// <summary>The combo selection as the Common enum (falls back to English).</summary>
+    private ClientLanguage CurrentLanguage()
+        => Enum.TryParse<ClientLanguage>(LanguageCombo.SelectedItem as string, out var lang) ? lang : ClientLanguage.English;
 
     // ---------- folder pickers ----------
 
@@ -76,12 +88,13 @@ public partial class MainWindow : Window
         s.SteamAccount = SteamAccountToggle.IsChecked == true;
         s.FreeTrial = FreeTrialToggle.IsChecked == true;
         s.DalamudEnabled = DalamudToggle.IsChecked == true;
+        s.Language = LanguageCombo.SelectedItem as string ?? "English";
         this.settingsService.Save();
 
         StartPipeline(s.DalamudEnabled);
     }
 
-    /// <summary>Fires a launch pipeline. While a game is up, launches are refused
+    /// <summary>Fires the login pipeline. While a game is up, launches are refused
     /// (shared prefix is single-instance) rather than stacked.</summary>
     private void StartPipeline(bool withDalamud)
     {
@@ -91,7 +104,7 @@ public partial class MainWindow : Window
             return;
         }
         LoginButton.IsEnabled = false;
-        _ = Task.Run(() => RunLaunchPipeline(withDalamud));
+        _ = Task.Run(() => RunLoginPipelineAsync(withDalamud));
     }
 
     /// <summary>Log to Serilog (console/file) and mirror the line into the UI status box.</summary>
@@ -102,20 +115,21 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Shared pipeline: settings (prefix, game location, proton path) -> prefix ensure
-    /// (create + bootstrap) -> credential-free fake-login launch, with the in-prefix
-    /// Windows injector (Phase B) or plain LinuxGameRunner launch (Phase A).
-    /// Runs off the UI thread; first-run prefix creation can take minutes.
-    /// Login path is not built yet — login dispatches to the fake-launch pipeline.
+    /// Milestone 4 pipeline: settings -> prefix ensure (create + bootstrap) -> gate check
+    /// -> real SE login (OauthLogin + RegisterSession) -> game patching when the server
+    /// returns a patch list -> launch with the encrypted login session args, via the
+    /// in-prefix Windows injector (Dalamud) or plain LinuxGameRunner.
+    /// Runs off the UI thread; first-run prefix creation and patching can take minutes.
     /// The WINEPREFIX root comes from settings.PrefixPath (default ~/.xivonlinux),
     /// so prefix, settings and dalamud data all live under ~/.xivonlinux.
     /// </summary>
-    private void RunLaunchPipeline(bool withDalamud)
+    private async Task RunLoginPipelineAsync(bool withDalamud)
     {
+        LoginService? service = null;
         try
         {
             var s = this.settingsService.Settings;
-            Report($"Pipeline start (dalamud: {withDalamud})");
+            Report($"Pipeline start (login, dalamud: {withDalamud})");
 
             var prefixRoot = string.IsNullOrEmpty(s.PrefixPath)
                 ? this.settingsService.Root.FullName
@@ -137,7 +151,7 @@ public partial class MainWindow : Window
                 Log.Error($"Proton path not found: {proton} — pick a Proton (default GE-Proton 11-6) under compatibilitytools.d; umu auto-select would upgrade a GE prefix, so launching is refused.");
                 return;
             }
-            Report($"Proton: {Path.GetFileName(proton)}");
+            Report($"Proton: {Path.GetFileName(proton.TrimEnd('/', '\\'))}");
 
             // GE/Proton convention: WINEPREFIX is the compatdata ROOT, proton appends pfx/.
             var prefix = new UmuPrefix(
@@ -153,32 +167,74 @@ public partial class MainWindow : Window
             new UmuCommandRunner(prefix).EnsurePrefix();
             Report("Prefix ready");
 
+            var lang = Enum.TryParse<ClientLanguage>(s.Language, out var l) ? l : ClientLanguage.English;
+            service = new LoginService(this.settingsService, prefix, lang);
+            Report($"Client language: {lang}");
+
+            Report("Checking login gate ...");
+            if (!await service.GateAvailableAsync())
+            {
+                Report("Login servers unreachable or maintenance in progress.");
+                return;
+            }
+
+            Report($"Logging in as {s.Username} (free trial: {s.FreeTrial})");
+            var result = await service.LoginAsync(s, gamePath);
+            Report($"Login state: {result.State}");
+
+            switch (result.State)
+            {
+                case XivGame.LoginState.NoService:
+                    Report("No service on this account (no subscription for this region).");
+                    return;
+                case XivGame.LoginState.NoTerms:
+                    Report("Terms not accepted on this account.");
+                    return;
+                case XivGame.LoginState.NeedsPatchBoot:
+                    Report("Boot conflict — boot files were modified outside the launcher; a reinstall is required.");
+                    return;
+                case XivGame.LoginState.NeedsPatchGame:
+                    Report($"Server returned {result.PendingPatches.Length} game patch(es)");
+                    var ok = await service.PatchAsync(result, s, Report);
+                    if (!ok)
+                    {
+                        Report("Patching failed — game not launched.");
+                        return;
+                    }
+                    result.State = XivGame.LoginState.Ok;
+                    break;
+            }
+
             if (withDalamud)
-                LaunchWithDansharing(prefix, gameExe, gamePath);
+                LaunchWithDansharing(prefix, service, gameExe, gamePath, result, lang);
             else
-                LaunchPlain(prefix, gamePath);
+                LaunchPlain(prefix, service, gamePath, result, lang);
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Launch pipeline failed");
+            Log.Error(ex, "Login pipeline failed");
             Dispatcher.UIThread.Post(() => StatusLog.Text += $"Launch failed: {ex.Message}\n");
         }
         finally
         {
+            service?.Dispose();
             Dispatcher.UIThread.Post(() => LoginButton.IsEnabled = true);
         }
     }
 
-    /// <summary>Phase A shape: upstream LoginAction.Fake — LaunchGame via LinuxGameRunner,
-    /// Steam service account, encrypted args, no injector.</summary>
-    private void LaunchPlain(UmuPrefix prefix, DirectoryInfo gamePath)
+    /// <summary>Plain launch: LaunchGame with the real login session (uid, region,
+    /// expansion) and encrypted args, UserPath pointing at ~/.xivonlinux/ffxivConfig
+    /// in Wine-style prefix path, no injector.</summary>
+    private void LaunchPlain(UmuPrefix prefix, LoginService service, DirectoryInfo gamePath, XivGame.LoginResult result, ClientLanguage lang)
     {
         var gameRunner = new LinuxGameRunner(prefix);
         var game = new XivGame(new LinuxSteamStub(), new NullUniqueIdCache(), FrontierUrlTemplate, "en");
 
-        Report("LaunchGame (fake login, Steam service account, encrypted args)");
-        var proc = game.LaunchGame(gameRunner, "0", 1, 2, true, "", "",
-            gamePath, ClientLanguage.Japanese, true, DpiAwareness.Unaware);
+        var userPathWine = prefix.UnixToWinePath(service.GameConfigFolder().FullName);
+        Report("LaunchGame (SE login session, encrypted args)");
+        var proc = game.LaunchGame(gameRunner, result.UniqueId ?? string.Empty, result.OauthLogin!.Region,
+            result.OauthLogin.MaxExpansion, false, $" UserPath={userPathWine}", "",
+            gamePath, lang, true, DpiAwareness.Unaware);
 
         if (proc is not null)
         {
@@ -195,10 +251,11 @@ public partial class MainWindow : Window
             Report("Launched ffxiv_dx11.exe via umu (pid not reported)");
     }
 
-    /// <summary>Phase B shape: Windows Dalamud injector run inside the prefix via umu
-    /// (spike/dalamud-harness verified). Run returns as soon as the injector's JSON
-    /// arrives (game is up); game exit is watched off the UI thread.</summary>
-    private void LaunchWithDansharing(UmuPrefix prefix, FileInfo gameExe, DirectoryInfo gamePath)
+    /// <summary>In-prefix injector launch with the real login: the injector gets the
+    /// encrypted game args (session, region, expansion, ver, UserPath); Run returns
+    /// as soon as the injector's JSON arrives (game is up); game exit is watched
+    /// off the UI thread.</summary>
+    private void LaunchWithDansharing(UmuPrefix prefix, LoginService service, FileInfo gameExe, DirectoryInfo gamePath, XivGame.LoginResult result, ClientLanguage lang)
     {
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var dalamudFiles = Path.Combine(home, "projects", "AI", "DalamudFiles");
@@ -219,7 +276,7 @@ public partial class MainWindow : Window
             LoggingPath = logs,
             PluginDirectory = Path.Combine(home, ".xlcore", "installedPlugins"),
             AssetDirectory = Path.Combine(dalamudFiles, "dalamudAssets", "447"),
-            Language = ClientLanguage.Japanese,
+            Language = lang,
             DelayInitializeMs = 0,
         };
 
@@ -230,11 +287,12 @@ public partial class MainWindow : Window
             ("WINEDOTNET_ROOT", runtimeWine),
             ("DALAMUD_RUNTIME", runtimeWine));
 
+        var gameArgs = service.BuildEncryptedGameArgs(result, gamePath, service.GameConfigFolder());
+
         Interlocked.Increment(ref activeLaunches);
-        Report("In-prefix injector: fake login + DllInject");
+        Report("In-prefix injector: SE login session + DllInject");
         var runner = new LinuxDalamudRunner(prefix);
-        var proc = runner.Run(injectorExe, true, false, false, gameExe,
-            "-fake -autoStart -autoLogin a -autoAcceptedTerms yes", "", env,
+        var proc = runner.Run(injectorExe, false, false, false, gameExe, gameArgs, "", env,
             DalamudLoadMethod.DllInject, startInfo);
 
         if (proc is null)

@@ -26,6 +26,7 @@ public sealed class LaunchSettings
     public bool SteamAccount { get; set; } = true;
     public bool FreeTrial { get; set; }
     public bool DalamudEnabled { get; set; } = true;
+    public string Language { get; set; } = "English";   // game client language: Japanese/English/German/French
 }
 
 /// <summary>
@@ -52,6 +53,9 @@ public sealed class SettingsService
     /// <summary>A subfolder of ~/.xivonlinux, created if missing (e.g. "patches").</summary>
     public DirectoryInfo GetFolder(string name) => this.storage.GetFolder(name);
 
+    /// <summary>A file path in ~/.xivonlinux (e.g. "aria2.log").</summary>
+    public FileInfo GetFile(string name) => this.storage.GetFile(name);
+
     public void Save()
     {
         var sb = new StringBuilder();
@@ -63,6 +67,7 @@ public sealed class SettingsService
         sb.AppendLine($"steam_account = {this.Settings.SteamAccount.ToString().ToLowerInvariant()}");
         sb.AppendLine($"free_trial = {this.Settings.FreeTrial.ToString().ToLowerInvariant()}");
         sb.AppendLine($"dalamud_enabled = {this.Settings.DalamudEnabled.ToString().ToLowerInvariant()}");
+        sb.AppendLine($"language = {TomlString(this.Settings.Language)}");
 
         var file = this.storage.GetFile("settings.toml");
         File.WriteAllText(file.FullName, sb.ToString());
@@ -89,6 +94,7 @@ public sealed class SettingsService
         s.SteamAccount = GetBool("steam_account");
         s.FreeTrial = GetBool("free_trial");
         s.DalamudEnabled = GetBool("dalamud_enabled");
+        if (Get("language") is string lg) s.Language = lg;
         return s;
     }
 
