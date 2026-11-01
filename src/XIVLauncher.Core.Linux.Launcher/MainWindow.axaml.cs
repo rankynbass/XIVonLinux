@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Serilog;
 using XIVLauncher.Common;
@@ -19,17 +20,66 @@ public partial class MainWindow : Window
     private const string FrontierUrlTemplate = "https://sqex-fragment.legacy.net/v650/index.html?rc_lang=en&time={1}";
 
     private int activeLaunches;
+    private readonly SettingsService settingsService;
 
     public MainWindow()
     {
         InitializeComponent();
+
+        this.settingsService = new SettingsService();
+        var s = this.settingsService.Settings;
+        ProtonPathBox.Text = s.ProtonPath;
+        PrefixPathBox.Text = s.PrefixPath;
+        GameLocationBox.Text = s.GameLocation;
+        PatchFolderBox.Text = s.PatchFolder;
+        UsernameBox.Text = s.Username;
+        PasswordBox.Text = s.Password;
+        OtpBox.Text = s.OneTimePassword;
+        SteamAccountToggle.IsChecked = s.SteamAccount;
+        FreeTrialToggle.IsChecked = s.FreeTrial;
+        DalamudToggle.IsChecked = s.DalamudEnabled;
     }
 
-    private void OnLaunchDalamud(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => StartPipeline(true);
+    // ---------- folder pickers ----------
 
-    private void OnLaunchNoDalamud(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => StartPipeline(false);
+    private async void OnBrowseProton(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => await PickFolderAsync(ProtonPathBox);
+
+    private async void OnBrowsePrefix(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => await PickFolderAsync(PrefixPathBox);
+
+    private async void OnBrowseGame(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => await PickFolderAsync(GameLocationBox);
+
+    private async void OnBrowsePatch(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => await PickFolderAsync(PatchFolderBox);
+
+    private async Task PickFolderAsync(TextBox box)
+    {
+        var folders = await this.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions());
+        if (folders.Count > 0)
+            box.Text = folders[0].Path.LocalPath;
+    }
+
+    // ---------- login ----------
+
+    private void OnLogin(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var s = this.settingsService.Settings;
+        s.ProtonPath = ProtonPathBox.Text;
+        s.PrefixPath = PrefixPathBox.Text;
+        s.GameLocation = GameLocationBox.Text;
+        s.PatchFolder = PatchFolderBox.Text;
+        s.Username = UsernameBox.Text;
+        s.Password = PasswordBox.Text;
+        s.OneTimePassword = OtpBox.Text;
+        s.SteamAccount = SteamAccountToggle.IsChecked == true;
+        s.FreeTrial = FreeTrialToggle.IsChecked == true;
+        s.DalamudEnabled = DalamudToggle.IsChecked == true;
+        this.settingsService.Save();
+
+        StartPipeline(s.DalamudEnabled);
+    }
 
     /// <summary>Fires a launch pipeline. While a game is up, launches are refused
     /// (shared prefix is single-instance) rather than stacked.</summary>
@@ -40,8 +90,7 @@ public partial class MainWindow : Window
             Report("A game is already running — close it before launching another");
             return;
         }
-        LaunchDalamudButton.IsEnabled = false;
-        LaunchPlainButton.IsEnabled = false;
+        LoginButton.IsEnabled = false;
         _ = Task.Run(() => RunLaunchPipeline(withDalamud));
     }
 
@@ -53,48 +102,61 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Shared pipeline: Steam install detection -> GE-Proton 11-6 pin -> prefix ensure
+    /// Shared pipeline: settings (prefix, game location, proton path) -> prefix ensure
     /// (create + bootstrap) -> credential-free fake-login launch, with the in-prefix
     /// Windows injector (Phase B) or plain LinuxGameRunner launch (Phase A).
     /// Runs off the UI thread; first-run prefix creation can take minutes.
+    /// Login path is not built yet — login dispatches to the fake-launch pipeline.
+    /// The WINEPREFIX root comes from settings.PrefixPath (default ~/.xivonlinux),
+    /// so prefix, settings and dalamud data all live under ~/.xivonlinux.
     /// </summary>
     private void RunLaunchPipeline(bool withDalamud)
     {
         try
         {
+            var s = this.settingsService.Settings;
             Report($"Pipeline start (dalamud: {withDalamud})");
-            var steam = SteamInstall.Detect();
-            if (steam is null)
+
+            var prefixRoot = string.IsNullOrEmpty(s.PrefixPath)
+                ? this.settingsService.Root.FullName
+                : s.PrefixPath;
+            Directory.CreateDirectory(prefixRoot);
+
+            var gamePath = new DirectoryInfo(s.GameLocation);
+            var gameExe = new FileInfo(Path.Combine(gamePath.FullName, "game", "ffxiv_dx11.exe"));
+            if (!File.Exists(gameExe.FullName))
             {
-                Log.Error("Steam FFXIV install not found (steamapps root, appmanifest_39210.acf StateFlags=4, game/ffxiv_dx11.exe).");
+                Log.Error($"Game exe not found: {gameExe.FullName} — pick the game folder containing game/ffxiv_dx11.exe.");
                 return;
             }
-            Report($"Steam install: {steam.GamePath.FullName}");
+            Report($"Game location: {gamePath.FullName}");
 
-            var proton = ProtonLocator.FindGeProton();
-            if (proton is null)
+            var proton = s.ProtonPath;
+            if (string.IsNullOrEmpty(proton) || !Directory.Exists(proton))
             {
-                Log.Error("GE-Proton 11-6 not found under compatibilitytools.d — umu auto-select would upgrade a GE prefix, so launching is refused.");
+                Log.Error($"Proton path not found: {proton} — pick a Proton (default GE-Proton 11-6) under compatibilitytools.d; umu auto-select would upgrade a GE prefix, so launching is refused.");
                 return;
             }
-            Report($"Proton pinned: {Path.GetFileName(proton)}");
+            Report($"Proton: {Path.GetFileName(proton)}");
 
+            // GE/Proton convention: WINEPREFIX is the compatdata ROOT, proton appends pfx/.
             var prefix = new UmuPrefix(
-                new DirectoryInfo(Path.Combine(steam.CompatDataPath, "pfx")),
-                steam.CompatDataPath,
-                steam.GamePath.FullName,
+                new DirectoryInfo(Path.Combine(prefixRoot, "pfx")),
+                prefixRoot,
+                gamePath.FullName,
                 "umu-steam",
                 proton,
-                steam.GamePath.FullName);
+                gamePath.FullName);
+            Report($"Prefix root: {prefixRoot}");
 
             Report("Ensuring prefix (create + bootstrap) — first run can take a few minutes");
             new UmuCommandRunner(prefix).EnsurePrefix();
             Report("Prefix ready");
 
             if (withDalamud)
-                LaunchWithDalamud(prefix, steam);
+                LaunchWithDansharing(prefix, gameExe, gamePath);
             else
-                LaunchPlain(prefix, steam);
+                LaunchPlain(prefix, gamePath);
         }
         catch (Exception ex)
         {
@@ -103,24 +165,20 @@ public partial class MainWindow : Window
         }
         finally
         {
-            Dispatcher.UIThread.Post(() =>
-            {
-                LaunchDalamudButton.IsEnabled = true;
-                LaunchPlainButton.IsEnabled = true;
-            });
+            Dispatcher.UIThread.Post(() => LoginButton.IsEnabled = true);
         }
     }
 
     /// <summary>Phase A shape: upstream LoginAction.Fake — LaunchGame via LinuxGameRunner,
     /// Steam service account, encrypted args, no injector.</summary>
-    private void LaunchPlain(UmuPrefix prefix, SteamInstall steam)
+    private void LaunchPlain(UmuPrefix prefix, DirectoryInfo gamePath)
     {
         var gameRunner = new LinuxGameRunner(prefix);
         var game = new XivGame(new LinuxSteamStub(), new NullUniqueIdCache(), FrontierUrlTemplate, "en");
 
         Report("LaunchGame (fake login, Steam service account, encrypted args)");
         var proc = game.LaunchGame(gameRunner, "0", 1, 2, true, "", "",
-            steam.GamePath, ClientLanguage.Japanese, true, DpiAwareness.Unaware);
+            gamePath, ClientLanguage.Japanese, true, DpiAwareness.Unaware);
 
         if (proc is not null)
         {
@@ -138,9 +196,9 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Phase B shape: Windows Dalamud injector run inside the prefix via umu
-    /// (spike/dalamud-harness verified). Run blocks for the game's lifetime — the injector
-    /// monitors the game process, so this call returns when the game exits.</summary>
-    private void LaunchWithDalamud(UmuPrefix prefix, SteamInstall steam)
+    /// (spike/dalamud-harness verified). Run returns as soon as the injector's JSON
+    /// arrives (game is up); game exit is watched off the UI thread.</summary>
+    private void LaunchWithDansharing(UmuPrefix prefix, FileInfo gameExe, DirectoryInfo gamePath)
     {
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var dalamudFiles = Path.Combine(home, "projects", "AI", "DalamudFiles");
@@ -151,7 +209,6 @@ public partial class MainWindow : Window
             Report($"FAIL: injector exe missing at {injectorExe.FullName}");
             return;
         }
-        var gameExe = new FileInfo(Path.Combine(steam.GamePath.FullName, "game", "ffxiv_dx11.exe"));
         var logs = Path.Combine(home, ".xlcore", "xivonlinux-logs");
         Directory.CreateDirectory(logs);
 
@@ -173,8 +230,6 @@ public partial class MainWindow : Window
             ("WINEDOTNET_ROOT", runtimeWine),
             ("DALAMUD_RUNTIME", runtimeWine));
 
-        // Run returns as soon as the injector's JSON arrives (game is up); watch its exit
-        // off the UI thread, buttons stay usable, report full injector output at exit.
         Interlocked.Increment(ref activeLaunches);
         Report("In-prefix injector: fake login + DllInject");
         var runner = new LinuxDalamudRunner(prefix);

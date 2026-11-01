@@ -2,17 +2,54 @@
     x:Class="XIVonLinux.Launcher.MainWindow"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Width="760"
-    Height="520"
+    Width="820"
+    Height="620"
     Title="XIVonLinux">
-    <StackPanel Margin="24">
+    <StackPanel Margin="24" Spacing="8">
         <TextBlock Text="XIVonLinux" FontSize="28" FontWeight="Bold" />
-        <TextBlock Text="Linux-native FFXIV launcher (Proton/umu + in-prefix Windows Dalamud)" Opacity="0.7" Margin="0,6,0,18" />
-        <StackPanel Orientation="Horizontal" Spacing="12">
-            <Button Content="Fake launch (with Dalamud)" Name="LaunchDalamudButton" Click="OnLaunchDalamud" />
-            <Button Content="Fake launch (no Dalamud)" Name="LaunchPlainButton" Click="OnLaunchNoDalamud" />
+        <TextBlock Text="Linux-native FFXIV launcher (Proton/umu + in-prefix Windows Dalamud)" Opacity="0.7" Margin="0,4,0,14" />
+
+        <!-- Path pickers -->
+        <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,0,0,14">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Proton" VerticalAlignment="Center" Margin="0,0,12,6" />
+            <TextBox Grid.Row="0" Grid.Column="1" Name="ProtonPathBox" Margin="0,0,8,6" />
+            <Button Grid.Row="0" Grid.Column="2" Content="Browse" Name="ProtonBrowseButton" Click="OnBrowseProton" Margin="0,0,0,6" />
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Prefix" VerticalAlignment="Center" Margin="0,0,12,6" />
+            <TextBox Grid.Row="1" Grid.Column="1" Name="PrefixPathBox" Margin="0,0,8,6" />
+            <Button Grid.Row="1" Grid.Column="2" Content="Browse" Name="PrefixBrowseButton" Click="OnBrowsePrefix" Margin="0,0,0,6" />
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Game" VerticalAlignment="Center" Margin="0,0,12,6" />
+            <TextBox Grid.Row="2" Grid.Column="1" Name="GameLocationBox" Margin="0,0,8,6" />
+            <Button Grid.Row="2" Grid.Column="2" Content="Browse" Name="GameBrowseButton" Click="OnBrowseGame" Margin="0,0,0,6" />
+
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="Patches" VerticalAlignment="Center" Margin="0,0,12,0" />
+            <TextBox Grid.Row="3" Grid.Column="1" Name="PatchFolderBox" Margin="0,0,8,0" />
+            <Button Grid.Row="3" Grid.Column="2" Content="Browse" Name="PatchBrowseButton" Click="OnBrowsePatch" Margin="0,0,0,0" />
+        </Grid>
+
+        <!-- Credentials -->
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Username" VerticalAlignment="Center" Margin="0,0,12,6" />
+            <TextBox Grid.Row="0" Grid.Column="1" Name="UsernameBox" Margin="0,0,0,6" />
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Password" VerticalAlignment="Center" Margin="0,0,12,6" />
+            <TextBox Grid.Row="1" Grid.Column="1" Name="PasswordBox" PasswordChar="*" Margin="0,0,0,6" />
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="OTP" VerticalAlignment="Center" Margin="0,0,12,0" />
+            <TextBox Grid.Row="2" Grid.Column="1" Name="OtpBox" Margin="0,0,0,0" />
+        </Grid>
+
+        <!-- Toggles -->
+        <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,14,0,14">
+            <ToggleButton Content="Steam account" Name="SteamAccountToggle" />
+            <ToggleButton Content="Free trial" Name="FreeTrialToggle" />
+            <ToggleButton Content="Dalamud" Name="DalamudToggle" IsChecked="True" />
         </StackPanel>
-        <TextBox Name="StatusLog" Margin="0,18,0,0" IsReadOnly="True" TextWrapping="Wrap"
-                 AcceptsReturn="True" Height="300" />
+
+        <Button Content="Login" Name="LoginButton" Click="OnLogin" Margin="0,0,0,14" />
+
+        <TextBox Name="StatusLog" IsReadOnly="True" TextWrapping="Wrap"
+                 AcceptsReturn="True" Height="260" />
     </StackPanel>
 </Window>
