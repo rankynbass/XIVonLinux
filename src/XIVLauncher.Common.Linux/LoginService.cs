@@ -404,7 +404,7 @@ public sealed class LoginService : IDisposable
     /// its config to, translated to a Wine-style prefix path. Same shape as
     /// Launcher.LaunchGame's internal ArgumentBuilder + upstream UserPath append.
     /// </summary>
-    public string BuildEncryptedGameArgs(Launcher.LoginResult loginResult, DirectoryInfo gamePath, DirectoryInfo gameConfigPath)
+    public string BuildEncryptedGameArgs(Launcher.LoginResult loginResult, DirectoryInfo gamePath, DirectoryInfo gameConfigPath, bool isSteamServiceAccount)
     {
         var builder = new ArgumentBuilder()
             .Append("DEV.DataPathType", "1")
@@ -416,8 +416,11 @@ public sealed class LoginService : IDisposable
             .Append("resetConfig", "0")
             .Append("ver", Repository.Ffxiv.GetVer(gamePath));
 
-        // Steam service account flags (upstream LaunchGame sets these when isSteamServiceAccount).
-        builder.Append("IsSteam", "1");
+        // Steam service account flags (upstream LaunchGame sets these ONLY when isSteamServiceAccount —
+        // appending IsSteam=1 for a plain SE account makes the game treat it as a Steam service
+        // account, which fails FT accounts with error 3109 "not registered").
+        if (isSteamServiceAccount)
+            builder.Append("IsSteam", "1");
 
         var userPath = prefix.UnixToWinePath(gameConfigPath.FullName);
         builder.Append("UserPath", userPath);

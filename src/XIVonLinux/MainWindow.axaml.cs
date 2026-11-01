@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -409,7 +410,7 @@ public partial class MainWindow : Window
 
                 Report($"Install complete: game ver {Repository.Ffxiv.GetVer(gamePath)}");
                 if (withDalamud)
-                    LaunchWithDansharing(prefix, service, gameExe, gamePath, installResult, lang);
+                    LaunchWithDansharing(prefix, service, gameExe, gamePath, installResult, lang, s.SteamAccount);
                 else
                     LaunchPlain(prefix, service, gamePath, installResult, lang, s.SteamAccount);
                 return;
@@ -446,7 +447,7 @@ public partial class MainWindow : Window
             }
 
             if (withDalamud)
-                LaunchWithDansharing(prefix, service, gameExe, gamePath, result, lang);
+                LaunchWithDansharing(prefix, service, gameExe, gamePath, result, lang, s.SteamAccount);
             else
                 LaunchPlain(prefix, service, gamePath, result, lang, s.SteamAccount);
         }
@@ -498,7 +499,7 @@ public partial class MainWindow : Window
     /// encrypted game args (session, region, expansion, ver, UserPath); Run returns
     /// as soon as the injector's JSON arrives (game is up); game exit is watched
     /// off the UI thread.</summary>
-    private void LaunchWithDansharing(UmuPrefix prefix, LoginService service, FileInfo gameExe, DirectoryInfo gamePath, XivGame.LoginResult result, ClientLanguage lang)
+    private void LaunchWithDansharing(UmuPrefix prefix, LoginService service, FileInfo gameExe, DirectoryInfo gamePath, XivGame.LoginResult result, ClientLanguage lang, bool isSteam)
     {
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var dalamudFiles = Path.Combine(home, "projects", "AI", "DalamudFiles");
@@ -526,12 +527,17 @@ public partial class MainWindow : Window
 
         // Wine .NET runtime for the in-prefix injector (M1-verified env shape; Wine-style paths).
         var runtimeWine = prefix.UnixToWinePath(Path.Combine(storage, "runtime"));
-        var env = new UmuInPrefixEnvironment(prefix).Build(
+        var envPairs = new List<(string, string)>
+        {
             ("DOTNET_ROOT", runtimeWine),
             ("WINEDOTNET_ROOT", runtimeWine),
-            ("DALAMUD_RUNTIME", runtimeWine));
+            ("DALAMUD_RUNTIME", runtimeWine),
+        };
+        if (isSteam)
+            envPairs.Add(("IS_FFXIV_LAUNCH_FROM_STEAM", "1"));
+        var env = new UmuInPrefixEnvironment(prefix).Build(envPairs.ToArray());
 
-        var gameArgs = service.BuildEncryptedGameArgs(result, gamePath, service.GameConfigFolder());
+        var gameArgs = service.BuildEncryptedGameArgs(result, gamePath, service.GameConfigFolder(), isSteam);
 
         Interlocked.Increment(ref activeLaunches);
         Report("In-prefix injector: SE login session + DllInject");

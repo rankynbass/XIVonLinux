@@ -82,6 +82,7 @@ public sealed class LinuxDalamudRunner : IDalamudRunner
             while ((line = proc.StandardOutput.ReadLine()) is not null)
             {
                 outCapture.AppendLine(line);
+                Log.Information("Injector stdout: {Line}", line.TrimEnd('\r'));
                 if (result is null)
                 {
                     var json = ExtractLastJsonObject(line);
@@ -99,8 +100,12 @@ public sealed class LinuxDalamudRunner : IDalamudRunner
         jsonFound.Wait(TimeSpan.FromSeconds(180));
         var winePid = result?.WinProcessId ?? result?.Pid;
         if (winePid is null)
+        {
+            Log.Error("Injector produced no result JSON within 180s; captured: {Out}", capturedUmuOutput);
             return null;
+        }
 
+        Log.Information("Injector result: wine pid {P}", winePid.Value);
         return MapWinePidToGameProcess(winePid.Value, proc);
     }
 
