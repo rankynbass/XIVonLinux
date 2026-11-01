@@ -12,10 +12,12 @@ internal static class Program
     public static void Main(string[] args)
     {
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var storage = Path.Combine(home, ".xivonlinux");
+        Directory.CreateDirectory(storage);
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
             .WriteTo.Console()
-            .WriteTo.File(Path.Combine(home, ".xlcore", "xivonlinux.log"))
+            .WriteTo.File(Path.Combine(storage, "xivonlinux.log"))
             .CreateLogger();
 
         try

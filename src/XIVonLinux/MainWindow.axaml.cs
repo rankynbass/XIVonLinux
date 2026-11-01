@@ -95,35 +95,12 @@ public partial class MainWindow : Window
         s.Language = LanguageCombo.SelectedItem as string ?? "English";
         this.settingsService.Save();
 
-        StartPipeline(s.DalamudEnabled, false);
-    }
-
-    /// <summary>Download-test: login, fetch the patch list against an overridden
-    /// (old) reported version, download the latest patch zip into an empty scratch
-    /// dir (~/.xivonlinux/patches-test) and SHA1-verify it. No install, no launch —
-    /// the game folder is never touched.</summary>
-    private void OnDownloadTest(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        var s = this.settingsService.Settings;
-        s.ProtonPath = ProtonPathBox.Text;
-        s.PrefixPath = PrefixPathBox.Text;
-        s.GameLocation = GameLocationBox.Text;
-        s.PatchFolder = PatchFolderBox.Text;
-        s.Username = UsernameBox.Text;
-        s.Password = PasswordBox.Text;
-        s.OneTimePassword = OtpBox.Text;
-        s.SteamAccount = SteamAccountToggle.IsChecked == true;
-        s.FreeTrial = FreeTrialToggle.IsChecked == true;
-        s.DalamudEnabled = DalamudToggle.IsChecked == true;
-        s.Language = LanguageCombo.SelectedItem as string ?? "English";
-        this.settingsService.Save();
-
-        StartPipeline(false, true);
+        StartPipeline(s.DalamudEnabled);
     }
 
     /// <summary>Fires the login pipeline. While a game is up, launches are refused
     /// (shared prefix is single-instance) rather than stacked.</summary>
-    private void StartPipeline(bool withDalamud, bool downloadTest)
+    private void StartPipeline(bool withDalamud)
     {
         if (activeLaunches > 0)
         {
@@ -131,8 +108,7 @@ public partial class MainWindow : Window
             return;
         }
         LoginButton.IsEnabled = false;
-        DownloadTestButton.IsEnabled = false;
-        _ = Task.Run(() => RunLoginPipelineAsync(withDalamud, downloadTest));
+        _ = Task.Run(() => RunLoginPipelineAsync(withDalamud));
     }
 
     /// <summary>Log to Serilog (console/file) and mirror the line into the UI status box.</summary>
@@ -319,13 +295,13 @@ public partial class MainWindow : Window
     /// The WINEPREFIX root comes from settings.PrefixPath (default ~/.xivonlinux),
     /// so prefix, settings and dalamud data all live under ~/.xivonlinux.
     /// </summary>
-    private async Task RunLoginPipelineAsync(bool withDalamud, bool downloadTest)
+    private async Task RunLoginPipelineAsync(bool withDalamud)
     {
         LoginService? service = null;
         try
         {
             var s = this.settingsService.Settings;
-            Report($"Pipeline start (login, download test: {downloadTest}, dalamud: {withDalamud})");
+            Report($"Pipeline start (login, dalamud: {withDalamud})");
 
             var prefixRoot = string.IsNullOrEmpty(s.PrefixPath)
                 ? this.settingsService.Root.FullName
@@ -336,12 +312,6 @@ public partial class MainWindow : Window
             var gameExe = new FileInfo(Path.Combine(gamePath.FullName, "game", "ffxiv_dx11.exe"));
             var gameInstalled = File.Exists(gameExe.FullName);
             Report($"Game location: {gamePath.FullName}");
-
-            if (!gameInstalled && downloadTest)
-            {
-                Report($"Game exe not found: {gameExe.FullName} — the download test needs an installed game (version + boot files to report).");
-                return;
-            }
 
             var proton = s.ProtonPath;
             if (string.IsNullOrEmpty(proton) || !Directory.Exists(proton))
@@ -449,36 +419,6 @@ public partial class MainWindow : Window
             var result = await service.LoginAsync(s, gamePath);
             Report($"Login state: {result.State}");
 
-            if (downloadTest)
-            {
-                // Download test: override the reported game version to
-                // Constants.BASE_GAME_VERSION so the server returns the FULL patch list
-                // for this install, then download the latest patch zip into an empty
-                // scratch dir (~/.xivonlinux/patches-test) and verify its per-block
-                // SHA1 hashes. No install, no launch — the game folder is untouched.
-                var testDir = new DirectoryInfo(Path.Combine(this.settingsService.Root.FullName, "patches-test"));
-                if (Directory.Exists(testDir.FullName))
-                {
-                    Directory.Delete(testDir.FullName, true);
-                    Report("Cleared previous patches-test dir");
-                }
-                Directory.CreateDirectory(testDir.FullName);
-
-                var patches = await service.FetchPatchListAsync(result, gamePath, Constants.BASE_GAME_VERSION);
-                Report($"Override report (base ver): server returned {patches.Length} patch entries");
-                if (patches.Length == 0)
-                {
-                    Report("No patches returned — nothing to download.");
-                    return;
-                }
-
-                var latest = patches[^1];
-                Report($"Latest patch: {latest.GetRepoName()}/{latest.VersionId} ({latest.Length / 1048576} MB, {latest.Hashes?.Length ?? 0} sha1 blocks) -> {testDir.FullName}");
-                var ok = await service.DownloadPatchAsync(latest, testDir, Report);
-                Report(ok ? $"Download test PASS: {latest.VersionId}" : $"Download test FAIL: {latest.VersionId}");
-                return;
-            }
-
             switch (result.State)
             {
                 case XivGame.LoginState.NoService:
@@ -521,7 +461,6 @@ public partial class MainWindow : Window
             Dispatcher.UIThread.Post(() =>
             {
                 LoginButton.IsEnabled = true;
-                DownloadTestButton.IsEnabled = true;
             });
         }
     }
@@ -570,22 +509,23 @@ public partial class MainWindow : Window
             Report($"FAIL: injector exe missing at {injectorExe.FullName}");
             return;
         }
-        var logs = Path.Combine(home, ".xlcore", "xivonlinux-logs");
+        var storage = this.settingsService.Root.FullName;
+        var logs = Path.Combine(storage, "xivonlinux-logs");
         Directory.CreateDirectory(logs);
 
         var startInfo = new DalamudStartInfo
         {
             WorkingDirectory = hooks,
-            ConfigurationPath = Path.Combine(home, ".xlcore", "xivonlinux-dalamudConfig.json"),
+            ConfigurationPath = Path.Combine(storage, "xivonlinux-dalamudConfig.json"),
             LoggingPath = logs,
-            PluginDirectory = Path.Combine(home, ".xlcore", "installedPlugins"),
+            PluginDirectory = Path.Combine(storage, "installedPlugins"),
             AssetDirectory = Path.Combine(dalamudFiles, "dalamudAssets", "447"),
             Language = lang,
             DelayInitializeMs = 0,
         };
 
         // Wine .NET runtime for the in-prefix injector (M1-verified env shape; Wine-style paths).
-        var runtimeWine = prefix.UnixToWinePath(Path.Combine(home, ".xlcore", "runtime"));
+        var runtimeWine = prefix.UnixToWinePath(Path.Combine(storage, "runtime"));
         var env = new UmuInPrefixEnvironment(prefix).Build(
             ("DOTNET_ROOT", runtimeWine),
             ("WINEDOTNET_ROOT", runtimeWine),
