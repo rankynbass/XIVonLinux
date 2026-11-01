@@ -91,12 +91,35 @@ public partial class MainWindow : Window
         s.Language = LanguageCombo.SelectedItem as string ?? "English";
         this.settingsService.Save();
 
-        StartPipeline(s.DalamudEnabled);
+        StartPipeline(s.DalamudEnabled, false);
+    }
+
+    /// <summary>Download-test: login, fetch the patch list against an overridden
+    /// (old) reported version, download the latest patch zip into an empty scratch
+    /// dir (~/.xivonlinux/patches-test) and SHA1-verify it. No install, no launch —
+    /// the game folder is never touched.</summary>
+    private void OnDownloadTest(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var s = this.settingsService.Settings;
+        s.ProtonPath = ProtonPathBox.Text;
+        s.PrefixPath = PrefixPathBox.Text;
+        s.GameLocation = GameLocationBox.Text;
+        s.PatchFolder = PatchFolderBox.Text;
+        s.Username = UsernameBox.Text;
+        s.Password = PasswordBox.Text;
+        s.OneTimePassword = OtpBox.Text;
+        s.SteamAccount = SteamAccountToggle.IsChecked == true;
+        s.FreeTrial = FreeTrialToggle.IsChecked == true;
+        s.DalamudEnabled = DalamudToggle.IsChecked == true;
+        s.Language = LanguageCombo.SelectedItem as string ?? "English";
+        this.settingsService.Save();
+
+        StartPipeline(false, true);
     }
 
     /// <summary>Fires the login pipeline. While a game is up, launches are refused
     /// (shared prefix is single-instance) rather than stacked.</summary>
-    private void StartPipeline(bool withDalamud)
+    private void StartPipeline(bool withDalamud, bool downloadTest)
     {
         if (activeLaunches > 0)
         {
@@ -104,7 +127,8 @@ public partial class MainWindow : Window
             return;
         }
         LoginButton.IsEnabled = false;
-        _ = Task.Run(() => RunLoginPipelineAsync(withDalamud));
+        DownloadTestButton.IsEnabled = false;
+        _ = Task.Run(() => RunLoginPipelineAsync(withDalamud, downloadTest));
     }
 
     /// <summary>Log to Serilog (console/file) and mirror the line into the UI status box.</summary>
@@ -123,13 +147,13 @@ public partial class MainWindow : Window
     /// The WINEPREFIX root comes from settings.PrefixPath (default ~/.xivonlinux),
     /// so prefix, settings and dalamud data all live under ~/.xivonlinux.
     /// </summary>
-    private async Task RunLoginPipelineAsync(bool withDalamud)
+    private async Task RunLoginPipelineAsync(bool withDalamud, bool downloadTest)
     {
         LoginService? service = null;
         try
         {
             var s = this.settingsService.Settings;
-            Report($"Pipeline start (login, dalamud: {withDalamud})");
+            Report($"Pipeline start (login, download test: {downloadTest}, dalamud: {withDalamud})");
 
             var prefixRoot = string.IsNullOrEmpty(s.PrefixPath)
                 ? this.settingsService.Root.FullName
@@ -140,7 +164,7 @@ public partial class MainWindow : Window
             var gameExe = new FileInfo(Path.Combine(gamePath.FullName, "game", "ffxiv_dx11.exe"));
             if (!File.Exists(gameExe.FullName))
             {
-                Log.Error($"Game exe not found: {gameExe.FullName} — pick the game folder containing game/ffxiv_dx11.exe.");
+                Report($"Game exe not found: {gameExe.FullName} — pick the game folder containing game/ffxiv_dx11.exe.");
                 return;
             }
             Report($"Game location: {gamePath.FullName}");
@@ -148,7 +172,7 @@ public partial class MainWindow : Window
             var proton = s.ProtonPath;
             if (string.IsNullOrEmpty(proton) || !Directory.Exists(proton))
             {
-                Log.Error($"Proton path not found: {proton} — pick a Proton (default GE-Proton 11-6) under compatibilitytools.d; umu auto-select would upgrade a GE prefix, so launching is refused.");
+                Report($"Proton path not found: {proton} — pick a Proton (default GE-Proton 11-6) under compatibilitytools.d; umu auto-select would upgrade a GE prefix, so launching is refused.");
                 return;
             }
             Report($"Proton: {Path.GetFileName(proton.TrimEnd('/', '\\'))}");
@@ -181,6 +205,36 @@ public partial class MainWindow : Window
             Report($"Logging in as {s.Username} (steam: {s.SteamAccount}, free trial: {s.FreeTrial})");
             var result = await service.LoginAsync(s, gamePath);
             Report($"Login state: {result.State}");
+
+            if (downloadTest)
+            {
+                // Download test: override the reported game version to
+                // Constants.BASE_GAME_VERSION so the server returns the FULL patch list
+                // for this install, then download the latest patch zip into an empty
+                // scratch dir (~/.xivonlinux/patches-test) and verify its per-block
+                // SHA1 hashes. No install, no launch — the game folder is untouched.
+                var testDir = new DirectoryInfo(Path.Combine(this.settingsService.Root.FullName, "patches-test"));
+                if (Directory.Exists(testDir.FullName))
+                {
+                    Directory.Delete(testDir.FullName, true);
+                    Report("Cleared previous patches-test dir");
+                }
+                Directory.CreateDirectory(testDir.FullName);
+
+                var patches = await service.FetchPatchListAsync(result, gamePath, Constants.BASE_GAME_VERSION);
+                Report($"Override report (base ver): server returned {patches.Length} patch entries");
+                if (patches.Length == 0)
+                {
+                    Report("No patches returned — nothing to download.");
+                    return;
+                }
+
+                var latest = patches[^1];
+                Report($"Latest patch: {latest.GetRepoName()}/{latest.VersionId} ({latest.Length / 1048576} MB, {latest.Hashes?.Length ?? 0} sha1 blocks) -> {testDir.FullName}");
+                var ok = await service.DownloadPatchAsync(latest, testDir, Report);
+                Report(ok ? $"Download test PASS: {latest.VersionId}" : $"Download test FAIL: {latest.VersionId}");
+                return;
+            }
 
             switch (result.State)
             {
@@ -218,7 +272,11 @@ public partial class MainWindow : Window
         finally
         {
             service?.Dispose();
-            Dispatcher.UIThread.Post(() => LoginButton.IsEnabled = true);
+            Dispatcher.UIThread.Post(() =>
+            {
+                LoginButton.IsEnabled = true;
+                DownloadTestButton.IsEnabled = true;
+            });
         }
     }
 
