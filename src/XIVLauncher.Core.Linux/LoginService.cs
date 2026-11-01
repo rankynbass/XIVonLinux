@@ -34,7 +34,7 @@ public sealed class LoginService : IDisposable
         this.settingsService = settings;
         this.prefix = prefix;
         this.language = language;
-        this.launcher = new Launcher(new LinuxSteamStub(), new NullUniqueIdCache(), FrontierUrlTemplate, "en");
+        this.launcher = new Launcher(new SteamworksSteam(), new NullUniqueIdCache(), FrontierUrlTemplate, "en");
     }
 
     /// <summary>Launch gate/login-server availability (upstream GetGateStatus shape).</summary>
@@ -53,18 +53,18 @@ public sealed class LoginService : IDisposable
     }
 
     /// <summary>
-    /// Real SE login: OauthLogin (username/password/OTP) + RegisterSession (version report
-    /// -> patch list + X-Patch-Unique-Id). isSteam must be false — Steam-account login needs
-    /// a Steamworks binding, which XIVonLinux does not have yet.
+    /// Login: Steam-account path (isSteam=true — Steamworks auth ticket via
+    /// SteamClient.Init(39210/312060 for free trial) + Ticket.Get) or SE credentials
+    /// (OauthLogin + RegisterSession). Launcher.Login drives Steam init, BLoggedOn
+    /// check and ticket retries; SteamException is thrown upstream on init/logon
+    /// failure. Username is the SE/Steam account name; Steam login ignores
+    /// password/OTP. Credentials are passed in-memory and never persisted.
     /// </summary>
     public async Task<Launcher.LoginResult> LoginAsync(LaunchSettings settings, DirectoryInfo gamePath)
     {
-        if (settings.SteamAccount)
-            throw new NotSupportedException("Steam-account login is not implemented on Linux yet (no Steamworks binding); use the Square Enix account option.");
-
         return await launcher.Login(
             settings.Username, settings.Password, settings.OneTimePassword,
-            isSteam: false, useCache: false, gamePath, forceBaseVersion: false,
+            settings.SteamAccount, useCache: false, gamePath, forceBaseVersion: false,
             settings.FreeTrial, language);
     }
 

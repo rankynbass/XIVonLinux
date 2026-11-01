@@ -20,6 +20,10 @@
         <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
         <PackageReference Include="Serilog" Version="4.2.0" />
         <PackageReference Include="Tomlyn" Version="2.10.1" />
+        <!-- Steamworks binding for Steam-account login (Facepunch.Steamworks, chippy branch:
+             the Win64-named assembly P/Invokes "steam_api64", which loads libsteam_api64.so
+             from the app dir on Linux; the native .so ships as app content). -->
+        <PackageReference Include="goaaats.Steamworks" Version="2.3.4" />
     </ItemGroup>
 
 </Project>

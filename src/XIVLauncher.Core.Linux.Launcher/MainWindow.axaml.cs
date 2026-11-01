@@ -178,7 +178,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            Report($"Logging in as {s.Username} (free trial: {s.FreeTrial})");
+            Report($"Logging in as {s.Username} (steam: {s.SteamAccount}, free trial: {s.FreeTrial})");
             var result = await service.LoginAsync(s, gamePath);
             Report($"Login state: {result.State}");
 
@@ -208,7 +208,7 @@ public partial class MainWindow : Window
             if (withDalamud)
                 LaunchWithDansharing(prefix, service, gameExe, gamePath, result, lang);
             else
-                LaunchPlain(prefix, service, gamePath, result, lang);
+                LaunchPlain(prefix, service, gamePath, result, lang, s.SteamAccount);
         }
         catch (Exception ex)
         {
@@ -225,15 +225,15 @@ public partial class MainWindow : Window
     /// <summary>Plain launch: LaunchGame with the real login session (uid, region,
     /// expansion) and encrypted args, UserPath pointing at ~/.xivonlinux/ffxivConfig
     /// in Wine-style prefix path, no injector.</summary>
-    private void LaunchPlain(UmuPrefix prefix, LoginService service, DirectoryInfo gamePath, XivGame.LoginResult result, ClientLanguage lang)
+    private void LaunchPlain(UmuPrefix prefix, LoginService service, DirectoryInfo gamePath, XivGame.LoginResult result, ClientLanguage lang, bool isSteam)
     {
         var gameRunner = new LinuxGameRunner(prefix);
         var game = new XivGame(new LinuxSteamStub(), new NullUniqueIdCache(), FrontierUrlTemplate, "en");
 
         var userPathWine = prefix.UnixToWinePath(service.GameConfigFolder().FullName);
-        Report("LaunchGame (SE login session, encrypted args)");
+        Report("LaunchGame (login session, encrypted args)");
         var proc = game.LaunchGame(gameRunner, result.UniqueId ?? string.Empty, result.OauthLogin!.Region,
-            result.OauthLogin.MaxExpansion, false, $" UserPath={userPathWine}", "",
+            result.OauthLogin.MaxExpansion, isSteam, $" UserPath={userPathWine}", "",
             gamePath, lang, true, DpiAwareness.Unaware);
 
         if (proc is not null)

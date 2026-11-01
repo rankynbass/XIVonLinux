@@ -17,6 +17,14 @@
     </ItemGroup>
 
     <ItemGroup>
+        <!-- Steamworks native: DllImport("steam_api64") resolves libsteam_api64.so from the app dir. -->
+        <None Remove="libsteam_api64.so" />
+        <Content Include="libsteam_api64.so">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="Avalonia" Version="12.1.4" />
         <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
         <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
