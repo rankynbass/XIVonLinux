@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace XIVLauncher.Core.Linux;
+namespace XIVLauncher.Common.Linux;
 
 /// <summary>
 /// A Proton (umu-managed) Wine prefix. Carries the umu game-drive environment and

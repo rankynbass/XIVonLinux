@@ -12,7 +12,7 @@ using XIVLauncher.Common;
 using XIVLauncher.Common.Dalamud;
 using XIVLauncher.Common.PlatformAbstractions;
 
-namespace XIVLauncher.Core.Linux;
+namespace XIVLauncher.Common.Linux;
 
 /// <summary>
 /// Unquoted injector arg builders. The reference DalamudInjectorArgs wraps paths in literal

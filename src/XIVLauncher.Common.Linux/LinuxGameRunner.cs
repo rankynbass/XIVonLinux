@@ -5,7 +5,7 @@ using System.IO;
 using XIVLauncher.Common;
 using XIVLauncher.Common.PlatformAbstractions;
 
-namespace XIVLauncher.Core.Linux;
+namespace XIVLauncher.Common.Linux;
 
 /// <summary>
 /// Launches the game through umu/Proton (replaces legacy UnixGameRunner's wine64 path).

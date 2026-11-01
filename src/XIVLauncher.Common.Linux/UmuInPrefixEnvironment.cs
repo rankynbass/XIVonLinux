@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading;
 using XIVLauncher.Common.PlatformAbstractions;
 
-namespace XIVLauncher.Core.Linux;
+namespace XIVLauncher.Common.Linux;
 
 /// <summary>
 /// Prefix-scoped environment variables for processes running inside the prefix

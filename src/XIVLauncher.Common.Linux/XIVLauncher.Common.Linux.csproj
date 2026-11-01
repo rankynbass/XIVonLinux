@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <Product>XIVLauncher.Core.Linux</Product>
-        <AssemblyTitle>XIVLauncher.Core.Linux</AssemblyTitle>
+        <Product>XIVLauncher.Common.Linux</Product>
+        <AssemblyTitle>XIVLauncher.Common.Linux</AssemblyTitle>
         <Description>Linux platform implementations for XIVLauncher.Core: Proton/umu-launcher game launching and in-prefix Windows Dalamud injection.</Description>
         <VersionPrefix>0.1.0</VersionPrefix>
         <Nullable>enable</Nullable>

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
-namespace XIVLauncher.Core.Linux;
+namespace XIVLauncher.Common.Linux;
 
 /// <summary>
 /// Locates the Steam install of FFXIV (appid 39210): Steam library root, appmanifest_39210.acf

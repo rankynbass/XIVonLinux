@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using XIVLauncher.Common.PlatformAbstractions;
 
-namespace XIVLauncher.Core.Linux;
+namespace XIVLauncher.Common.Linux;
 
 /// <summary>
 /// Stub Steam integration. Full Steamworks bindings will come later; for now the

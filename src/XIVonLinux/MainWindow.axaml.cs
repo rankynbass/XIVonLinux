@@ -9,10 +9,10 @@ using Avalonia.Threading;
 using Serilog;
 using XIVLauncher.Common;
 using XIVLauncher.Common.Dalamud;
-using XIVLauncher.Core.Linux;
+using XIVLauncher.Common.Linux;
 using XivGame = XIVLauncher.Common.Game.Launcher;
 
-namespace XIVonLinux.Launcher;
+namespace XIVonLinux;
 
 public partial class MainWindow : Window
 {

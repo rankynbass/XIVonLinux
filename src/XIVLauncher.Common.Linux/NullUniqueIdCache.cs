@@ -1,6 +1,6 @@
 using XIVLauncher.Common.PlatformAbstractions;
 
-namespace XIVLauncher.Core.Linux;
+namespace XIVLauncher.Common.Linux;
 
 /// <summary>
 /// No-op unique-ID cache (Launcher's SE-login uid cache; not touched by LaunchGame).

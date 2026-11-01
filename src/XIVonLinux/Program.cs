@@ -4,7 +4,7 @@ using Avalonia;
 using Avalonia.Logging;
 using Serilog;
 
-namespace XIVonLinux.Launcher;
+namespace XIVonLinux;
 
 internal static class Program
 {

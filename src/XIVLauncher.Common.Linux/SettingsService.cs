@@ -6,7 +6,7 @@ using Tomlyn.Model;
 using Tomlyn.Serialization;
 using XIVLauncher.Common;
 
-namespace XIVLauncher.Core.Linux;
+namespace XIVLauncher.Common.Linux;
 
 /// <summary>
 /// User-configurable launcher settings, persisted as ~/.xivonlinux/settings.toml

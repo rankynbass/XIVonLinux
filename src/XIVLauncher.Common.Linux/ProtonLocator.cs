@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace XIVLauncher.Core.Linux;
+namespace XIVLauncher.Common.Linux;
 
 /// <summary>
 /// Finds a GE-Proton build in Steam's compatibilitytools.d. The launcher pins the Milestone-1

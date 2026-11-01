@@ -2,7 +2,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 
-namespace XIVonLinux.Launcher;
+namespace XIVonLinux;
 
 public partial class App : Application
 {

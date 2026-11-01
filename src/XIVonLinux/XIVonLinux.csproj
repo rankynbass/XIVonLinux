@@ -13,7 +13,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\XIVLauncher.Core.Linux\XIVLauncher.Core.Linux.csproj" />
+        <ProjectReference Include="..\XIVLauncher.Common.Linux\XIVLauncher.Common.Linux.csproj" />
     </ItemGroup>
 
     <ItemGroup>

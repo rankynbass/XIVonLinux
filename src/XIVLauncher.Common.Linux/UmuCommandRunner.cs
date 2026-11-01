@@ -5,7 +5,7 @@ using System.Text;
 using XIVLauncher.Common.PlatformAbstractions;
 using Serilog;
 
-namespace XIVLauncher.Core.Linux;
+namespace XIVLauncher.Common.Linux;
 
 /// <summary>
 /// Runs commands through umu-run inside a UmuPrefix (replaces the legacy wine64

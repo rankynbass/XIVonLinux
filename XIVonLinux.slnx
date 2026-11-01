@@ -6,7 +6,7 @@
     <Project Path="lib/FFXIVQuickLauncher/src/XIVLauncher.Common/XIVLauncher.Common.csproj" />
   </Folder>
   <Folder Name="/src/">
-    <Project Path="src/XIVLauncher.Core.Linux.Launcher/XIVLauncher.Core.Linux.Launcher.csproj" />
-    <Project Path="src/XIVLauncher.Core.Linux/XIVLauncher.Core.Linux.csproj" />
+    <Project Path="src/XIVonLinux/XIVonLinux.csproj" />
+    <Project Path="src/XIVLauncher.Common.Linux/XIVLauncher.Common.Linux.csproj" />
   </Folder>
 </Solution>

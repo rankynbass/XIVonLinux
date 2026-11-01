@@ -2,7 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using XIVLauncher.Common.PlatformAbstractions;
 
-namespace XIVLauncher.Core.Linux;
+namespace XIVLauncher.Common.Linux;
 
 /// <summary>
 /// Proton/umu path has no Wine-architecture checks to run (the prefix is managed by
@@ -13,7 +13,7 @@ public sealed class LinuxDalamudCompatibilityCheck : IDalamudCompatibilityCheck
     public void EnsureCompatibility()
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            throw new PlatformNotSupportedException("XIVLauncher.Core.Linux runs on Linux only.");
+            throw new PlatformNotSupportedException("XIVLauncher.Common.Linux runs on Linux only.");
 
         // Proton prefixes handle x86/x64 natively; nothing else to gate.
     }

@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Steamworks;
 using XIVLauncher.Common.PlatformAbstractions;
 
-namespace XIVLauncher.Core.Linux;
+namespace XIVLauncher.Common.Linux;
 
 /// <summary>
 /// Real Steamworks binding for Steam-account login: Facepunch.Steamworks (goaaats.Steamworks
