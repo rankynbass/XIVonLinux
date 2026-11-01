@@ -11,6 +11,8 @@ using Avalonia.Threading;
 using Serilog;
 using XIVLauncher.Common;
 using XIVLauncher.Common.Dalamud;
+using XIVLauncher.Common.Game;
+using XIVLauncher.Common.Game.Patch;
 using XIVLauncher.Common.Linux;
 using XivGame = XIVLauncher.Common.Game.Launcher;
 
@@ -197,6 +199,117 @@ public partial class MainWindow : Window
         return cont;
     }
 
+    // ---- download progress popup ----------------------------------------------------
+    // A non-modal popup showing up to 5 live download bars. Rows are rebuilt each
+    // second from LoginService.ProgressSnapshot: in-progress slots show bytes/speed
+    // bars, queued patches show as queued; finished downloads are excluded, so bars
+    // disappear one by one as fewer pieces remain.
+
+    private Window? progressWindow;
+    private DispatcherTimer? progressTimer;
+    private StackPanel? progressPanel;
+    private TextBlock? progressSummary;
+
+    private void OpenProgressPopup(string title)
+    {
+        progressWindow = new Window
+        {
+            Title = title,
+            Width = 560,
+            Height = 300,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        progressSummary = new TextBlock { Margin = new Thickness(16, 14, 16, 8), Text = "Starting downloads ..." };
+        progressPanel = new StackPanel { Margin = new Thickness(16, 0, 16, 16) };
+
+        var outer = new StackPanel();
+        outer.Children.Add(progressSummary);
+        outer.Children.Add(progressPanel);
+        progressWindow.Content = outer;
+
+        // Cancel pauses (cancels) all downloads, then closes. Closing the window with
+        // the X button does the same via the Closing event.
+        var cancelRow = new DockPanel { LastChildFill = false, Margin = new Thickness(16, 4, 16, 14) };
+        var cancelButton = new Button { Content = "Cancel", Padding = new Thickness(16, 6) };
+        DockPanel.SetDock(cancelButton, Dock.Right);
+        cancelRow.Children.Add(cancelButton);
+        outer.Children.Add(cancelRow);
+
+        cancelButton.Click += (_, __) =>
+        {
+            LoginService.CancelCurrentDownloads();
+            Dispatcher.UIThread.Post(() => progressWindow?.Close());
+        };
+
+        progressWindow.Closing += (_, __) => LoginService.CancelCurrentDownloads();
+
+        progressWindow.Show(this);
+
+        progressTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        progressTimer.Tick += (_, __) => UpdateProgressPopup();
+        progressTimer.Start();
+        UpdateProgressPopup();
+    }
+
+    private void UpdateProgressPopup()
+    {
+        if (progressPanel is null || progressSummary is null)
+            return;
+
+        var patcher = LoginService.CurrentPatcher;
+        var rows = LoginService.ProgressSnapshot(patcher);
+
+        var done = patcher?.Downloads.Count(d => d.State == PatchState.Finished) ?? 0;
+        var totalPatches = patcher?.Downloads.Count ?? 0;
+        var speed = rows.Sum(r => r.SpeedBps) / 1024 / 1024;
+
+        progressSummary.Text = $"{done}/{totalPatches} downloaded · {speed:0.0} MB/s";
+
+        progressPanel.Children.Clear();
+        foreach (var r in rows)
+        {
+            var label = r.State switch
+            {
+                "queued" => $"{r.VersionId} — queued ({FmtBytes(r.Total)})",
+                "verifying" => $"{r.VersionId} — verifying SHA1 {FmtBytes(r.Downloaded)}/{FmtBytes(r.Total)}",
+                _ => $"{r.VersionId} — {FmtBytes(r.Downloaded)}/{FmtBytes(r.Total)} at {r.SpeedBps / 1024 / 1024:0.0} MB/s",
+            };
+            progressPanel.Children.Add(new TextBlock
+            {
+                Text = label,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 4, 0, 0),
+            });
+            progressPanel.Children.Add(new ProgressBar
+            {
+                Minimum = 0,
+                Maximum = Math.Max(1, r.Total),
+                Value = r.Downloaded,
+                Height = 8,
+                Margin = new Thickness(0, 2, 0, 2),
+            });
+        }
+    }
+
+    private void CloseProgressPopup()
+    {
+        progressTimer?.Stop();
+        progressTimer = null;
+        progressWindow?.Close();
+        progressWindow = null;
+        progressPanel = null;
+        progressSummary = null;
+    }
+
+    private static string FmtBytes(long bytes)
+    {
+        if (bytes >= 1L << 30) return $"{bytes / 1024.0 / 1024 / 1024:0.00} GB";
+        if (bytes >= 1L << 20) return $"{bytes / 1024.0 / 1024:0.0} MB";
+        if (bytes >= 1L << 10) return $"{bytes / 1024.0:0.0} KB";
+        return $"{bytes} B";
+    }
+
     /// <summary>
     /// Milestone 4 pipeline: settings -> prefix ensure (create + bootstrap) -> gate check
     /// -> real SE login (OauthLogin + RegisterSession) -> game patching when the server
@@ -296,10 +409,12 @@ public partial class MainWindow : Window
                 Report($"Boot patch list: {bootPatches.Length} entries");
                 if (bootPatches.Length > 0)
                 {
+                    await Dispatcher.UIThread.InvokeAsync(() => OpenProgressPopup("Installing boot patches"));
                     var okBoot = await service.InstallPatchesAsync(Repository.Boot, bootPatches, string.Empty, s, Report);
+                    await Dispatcher.UIThread.InvokeAsync(() => CloseProgressPopup());
                     if (!okBoot)
                     {
-                        Report("Boot install failed — game not installed.");
+                        Report("Boot install stopped (cancelled from the progress popup, or failed).");
                         return;
                     }
                 }
@@ -313,10 +428,12 @@ public partial class MainWindow : Window
                     return;
                 }
 
+                await Dispatcher.UIThread.InvokeAsync(() => OpenProgressPopup("Installing game patches"));
                 var okAll = await service.InstallPatchesAsync(Repository.Ffxiv, installResult.PendingPatches, installResult.UniqueId ?? string.Empty, s, Report);
+                await Dispatcher.UIThread.InvokeAsync(() => CloseProgressPopup());
                 if (!okAll)
                 {
-                    Report("Game patch install failed — game not installed.");
+                    Report("Game install stopped (cancelled from the progress popup, or failed) — game not installed.");
                     return;
                 }
 
@@ -375,10 +492,13 @@ public partial class MainWindow : Window
                     return;
                 case XivGame.LoginState.NeedsPatchGame:
                     Report($"Server returned {result.PendingPatches.Length} game patch(es)");
+                    if (result.PendingPatches.Length > 0)
+                        await Dispatcher.UIThread.InvokeAsync(() => OpenProgressPopup("Installing game patches"));
                     var ok = await service.PatchAsync(result, s, Report);
+                    await Dispatcher.UIThread.InvokeAsync(() => CloseProgressPopup());
                     if (!ok)
                     {
-                        Report("Patching failed — game not launched.");
+                        Report("Patching stopped (cancelled from the progress popup, or failed) — game not launched.");
                         return;
                     }
                     result.State = XivGame.LoginState.Ok;

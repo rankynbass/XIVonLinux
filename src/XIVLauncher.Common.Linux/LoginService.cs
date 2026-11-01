@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
@@ -109,6 +111,72 @@ public sealed class LoginService : IDisposable
     /// by PatchManager. status receives progress lines. Repository.Boot drives the
     /// boot dir, Repository.Ffxiv the game dir; uid is the patch unique id ("" for boot).
     /// </summary>
+    /// <summary>
+    /// The PatchManager currently running an install (null between installs). The UI
+    /// polls its public slots/Progresses/Speeds arrays via ProgressSnapshot to drive
+    /// the download progress popup.
+    /// </summary>
+    public static PatchManager? CurrentPatcher { get; private set; }
+
+    /// <summary>One uncompleted download as shown in the progress popup.</summary>
+    public sealed class DownloadSlotInfo
+    {
+        public string VersionId = "";
+        public long Total;
+        public long Downloaded;
+        public double SpeedBps;
+        public string State = "queued"; // downloading | verifying | queued
+    }
+
+    /// <summary>
+    /// Snapshot of uncompleted downloads for the progress popup: in-progress slots
+    /// (live bytes/speed; "Done" slots are excluded so finished bars disappear),
+    /// then queued patches not yet started. Sorted by downloaded bytes descending,
+    /// capped to 5 rows.
+    /// </summary>
+    public static List<DownloadSlotInfo> ProgressSnapshot(PatchManager? patcher)
+    {
+        var rows = new List<DownloadSlotInfo>();
+        if (patcher is null)
+            return rows;
+
+        for (var i = 0; i < PatchManager.MAX_DOWNLOADS_AT_ONCE; i++)
+        {
+            var act = patcher.Actives[i];
+            if (act is null)
+                continue;
+            var slot = patcher.Slots[i];
+            if (slot == PatchManager.SlotState.Done)
+                continue;
+            rows.Add(new DownloadSlotInfo
+            {
+                VersionId = act.Patch.VersionId,
+                Total = act.Patch.Length,
+                Downloaded = patcher.Progresses[i],
+                SpeedBps = patcher.Speeds[i],
+                State = slot == PatchManager.SlotState.InProgress ? "downloading" : "verifying",
+            });
+        }
+
+        foreach (var d in patcher.Downloads)
+        {
+            if (d.State == PatchState.Nothing)
+                rows.Add(new DownloadSlotInfo { VersionId = d.Patch.VersionId, Total = d.Patch.Length, Downloaded = 0, SpeedBps = 0, State = "queued" });
+        }
+
+        return rows.OrderByDescending(r => r.State == "queued" ? -1 : r.Downloaded).Take(5).ToList();
+    }
+
+    /// <summary>
+    /// Pause/abort the running install: PatchManager.StartCancellation cancels all
+    /// aria2 downloads (the running InstallPatchesAsync then returns false). Called by
+    /// the progress popup's Cancel button and by its window close (X).
+    /// </summary>
+    public static void CancelCurrentDownloads()
+    {
+        CurrentPatcher?.StartCancellation();
+    }
+
     public async Task<bool> InstallPatchesAsync(Repository repo, PatchListEntry[] patches, string uid, LaunchSettings settings, Action<string> status)
     {
         var gamePath = new DirectoryInfo(settings.GameLocation);
@@ -129,11 +197,13 @@ public sealed class LoginService : IDisposable
 
         var patcher = new PatchManager(acquisition, 0, repo, patches,
             gamePath, patchStore, installer, launcher, uid);
+        CurrentPatcher = patcher;
 
         var total = patcher.Downloads.Count;
         status($"{repo}: {total} patches to download/install");
 
         var done = await patcher.PatchAsync(false);
+        CurrentPatcher = null;
 
         var speed = 0d;
         foreach (var s in patcher.Speeds) speed += s;
