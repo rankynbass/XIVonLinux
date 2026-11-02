@@ -14,7 +14,7 @@
             <Button Content="Save" Name="SaveButton" Click="OnSave" MinWidth="96" />
         </StackPanel>
 
-        <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+        <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
             <TextBlock Grid.Row="0" Grid.Column="0" Text="Proton" VerticalAlignment="Center" Margin="0,0,12,6" />
             <TextBox Grid.Row="0" Grid.Column="1" Name="ProtonPathBox" Margin="0,0,8,6" />
             <Button Grid.Row="0" Grid.Column="2" Content="Browse" Name="ProtonBrowseButton" Click="OnBrowseProton" Margin="0,0,0,6" />
@@ -27,14 +27,18 @@
             <TextBox Grid.Row="2" Grid.Column="1" Name="GameLocationBox" Margin="0,0,8,6" />
             <Button Grid.Row="2" Grid.Column="2" Content="Browse" Name="GameBrowseButton" Click="OnBrowseGame" Margin="0,0,0,6" />
 
-            <TextBlock Grid.Row="3" Grid.Column="0" Text="Patches" VerticalAlignment="Center" Margin="0,0,12,6" />
-            <TextBox Grid.Row="3" Grid.Column="1" Name="PatchFolderBox" Margin="0,0,8,6" />
-            <Button Grid.Row="3" Grid.Column="2" Content="Browse" Name="PatchBrowseButton" Click="OnBrowsePatch" Margin="0,0,0,6" />
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="Config" VerticalAlignment="Center" Margin="0,0,12,6" />
+            <TextBox Grid.Row="3" Grid.Column="1" Name="ConfigPathBox" Margin="0,0,8,6" />
+            <Button Grid.Row="3" Grid.Column="2" Content="Browse" Name="ConfigBrowseButton" Click="OnBrowseConfig" Margin="0,0,0,6" />
 
-            <TextBlock Grid.Row="4" Grid.Column="0" Text="Language" VerticalAlignment="Center" Margin="0,0,12,6" />
-            <ComboBox Grid.Row="4" Grid.Column="1" Name="LanguageCombo" Margin="0,0,0,6" />
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="Patches" VerticalAlignment="Center" Margin="0,0,12,6" />
+            <TextBox Grid.Row="4" Grid.Column="1" Name="PatchFolderBox" Margin="0,0,8,6" />
+            <Button Grid.Row="4" Grid.Column="2" Content="Browse" Name="PatchBrowseButton" Click="OnBrowsePatch" Margin="0,0,0,6" />
 
-            <CheckBox Grid.Row="5" Grid.Column="1" Content="Enable Dalamud" Name="DalamudCheck"
+            <TextBlock Grid.Row="5" Grid.Column="0" Text="Language" VerticalAlignment="Center" Margin="0,0,12,6" />
+            <ComboBox Grid.Row="5" Grid.Column="1" Name="LanguageCombo" Margin="0,0,0,6" />
+
+            <CheckBox Grid.Row="6" Grid.Column="1" Content="Enable Dalamud" Name="DalamudCheck"
                       HorizontalAlignment="Left" Margin="0,6,0,0" />
         </Grid>
     </DockPanel>

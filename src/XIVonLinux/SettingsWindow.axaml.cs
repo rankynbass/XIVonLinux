@@ -23,6 +23,7 @@ public partial class SettingsWindow : Window
         ProtonPathBox.Text = s.ProtonPath;
         PrefixPathBox.Text = s.PrefixPath;
         GameLocationBox.Text = s.GameLocation;
+        ConfigPathBox.Text = s.ConfigPath;
         PatchFolderBox.Text = s.PatchFolder;
         LanguageCombo.Items.Add("English");
         LanguageCombo.Items.Add("Japanese");
@@ -43,6 +44,9 @@ public partial class SettingsWindow : Window
     private async void OnBrowseGame(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => await PickFolderAsync(GameLocationBox);
 
+    private async void OnBrowseConfig(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => await PickFolderAsync(ConfigPathBox);
+
     private async void OnBrowsePatch(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => await PickFolderAsync(PatchFolderBox);
 
@@ -62,6 +66,7 @@ public partial class SettingsWindow : Window
         s.ProtonPath = ProtonPathBox.Text;
         s.PrefixPath = PrefixPathBox.Text;
         s.GameLocation = GameLocationBox.Text;
+        s.ConfigPath = ConfigPathBox.Text;
         s.PatchFolder = PatchFolderBox.Text;
         s.Language = LanguageCombo.SelectedItem as string ?? "English";
         s.DalamudEnabled = DalamudCheck.IsChecked == true;

@@ -436,8 +436,15 @@ public sealed class LoginService : IDisposable
         return builder.BuildEncrypted();
     }
 
-    /// <summary>Game config folder under ~/.xivonlinux (upstream storage.GetFolder("ffxivConfig")).</summary>
-    public DirectoryInfo GameConfigFolder() => settingsService.GetFolder("ffxivConfig");
+    /// <summary>Game config folder (character data): settings ConfigPath, default
+    /// ~/.xivonlinux/ffxivConfig (upstream storage.GetFolder("ffxivConfig")); created
+    /// on first use.</summary>
+    public DirectoryInfo GameConfigFolder()
+    {
+        var dir = new DirectoryInfo(settingsService.Settings.ConfigPath);
+        dir.Create();
+        return dir;
+    }
 
     public void Dispose()
     {

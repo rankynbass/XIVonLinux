@@ -20,6 +20,7 @@ public sealed class LaunchSettings
     public string PrefixPath { get; set; } = "";   // WINEPREFIX root; prefix dir = {PrefixPath}/pfx
     public string GameLocation { get; set; } = "";
     public string PatchFolder { get; set; } = "";
+    public string ConfigPath { get; set; } = "";   // character data folder (ffxivConfig)
     public string Username { get; set; } = "";
     public string Password { get; set; } = "";   // UI-only, never persisted
     public string OneTimePassword { get; set; } = ""; // UI-only, never persisted
@@ -63,6 +64,7 @@ public sealed class SettingsService
         sb.AppendLine($"prefix_path = {TomlString(this.Settings.PrefixPath)}");
         sb.AppendLine($"game_location = {TomlString(this.Settings.GameLocation)}");
         sb.AppendLine($"patch_folder = {TomlString(this.Settings.PatchFolder)}");
+        sb.AppendLine($"config_path = {TomlString(this.Settings.ConfigPath)}");
         sb.AppendLine($"username = {TomlString(this.Settings.Username)}");
         sb.AppendLine($"steam_account = {this.Settings.SteamAccount.ToString().ToLowerInvariant()}");
         sb.AppendLine($"free_trial = {this.Settings.FreeTrial.ToString().ToLowerInvariant()}");
@@ -90,6 +92,7 @@ public sealed class SettingsService
         if (Get("prefix_path") is string px) s.PrefixPath = px;
         if (Get("game_location") is string gl) s.GameLocation = gl;
         if (Get("patch_folder") is string pf) s.PatchFolder = pf;
+        if (Get("config_path") is string cp) s.ConfigPath = cp;
         if (Get("username") is string un) s.Username = un;
         s.SteamAccount = GetBool("steam_account");
         s.FreeTrial = GetBool("free_trial");
@@ -114,6 +117,9 @@ public sealed class SettingsService
 
         if (string.IsNullOrEmpty(this.Settings.PatchFolder))
             this.Settings.PatchFolder = this.storage.GetFolder("patches").FullName;
+
+        if (string.IsNullOrEmpty(this.Settings.ConfigPath))
+            this.Settings.ConfigPath = this.storage.GetFolder("ffxivConfig").FullName;
     }
 
     private static string TomlString(string value)
