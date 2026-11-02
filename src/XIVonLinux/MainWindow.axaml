@@ -2,8 +2,10 @@
     x:Class="XIVonLinux.MainWindow"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Width="950"
-    Height="560"
+    Width="960"
+    Height="600"
+    MinWidth="640"
+    MinHeight="400"
     Title="XIVonLinux">
     <DockPanel Margin="20">
 
@@ -23,15 +25,21 @@
                 <!-- A. News banner + headlines: visible while the log is hidden -->
                 <Border Name="NewsPanel"
                         BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" CornerRadius="4">
-                    <ScrollViewer Name="NewsScroll" HorizontalScrollBarVisibility="Disabled"
-                                  VerticalScrollBarVisibility="Visible">
-                        <StackPanel Margin="12" Spacing="8">
+                    <DockPanel>
+                        <!-- Banner section: fixed slot that shrinks with the column width
+                             (max 640x250, left-aligned); it never scrolls -->
+                        <StackPanel DockPanel.Dock="Top" Margin="12,12,12,8" Spacing="8">
                             <TextBlock Name="NewsLoadingText" Text="Loading news..." />
                             <Image Name="BannerImage" IsVisible="False" MaxWidth="640" MaxHeight="250"
-                                   Stretch="Uniform" />
-                            <StackPanel Name="NewsList" Spacing="4" />
+                                   HorizontalAlignment="Left" Stretch="Uniform" />
                         </StackPanel>
-                    </ScrollViewer>
+
+                        <!-- Headlines section: scrolls vertically when the frame shrinks -->
+                        <ScrollViewer Name="NewsScroll" HorizontalScrollBarVisibility="Disabled"
+                                      VerticalScrollBarVisibility="Visible">
+                            <StackPanel Name="NewsList" Margin="12,0,12,12" Spacing="4" />
+                        </ScrollViewer>
+                    </DockPanel>
                 </Border>
 
                 <!-- Log box: replaces the news area when shown -->
@@ -39,18 +47,21 @@
                          IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" />
             </Grid>
 
-            <!-- B. Login section -->
-            <StackPanel Grid.Row="0" Grid.Column="1" MinWidth="200" Spacing="6">
-                <TextBlock Text="Username" Margin="0,0,0,2" />
-                <TextBox Name="UsernameBox" />
-                <TextBlock Text="Password" Margin="0,8,0,2" />
-                <TextBox Name="PasswordBox" PasswordChar="*" />
-                <TextBlock Text="OTP" Margin="0,8,0,2" />
-                <TextBox Name="OtpBox" />
-                <CheckBox Content="Steam account" Name="SteamAccountCheck" Margin="0,12,0,0" />
-                <CheckBox Content="Free trial" Name="FreeTrialCheck" Margin="0,2,0,0" />
-                <Button Content="Login" Name="LoginButton" Click="OnLogin" Margin="0,12,0,0" />
-            </StackPanel>
+            <!-- B. Login section: scrolls when the window is shrunk vertically -->
+            <ScrollViewer Grid.Row="0" Grid.Column="1" VerticalScrollBarVisibility="Visible"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel MinWidth="200" Spacing="6">
+                    <TextBlock Text="Username" Margin="0,0,0,2" />
+                    <TextBox Name="UsernameBox" />
+                    <TextBlock Text="Password" Margin="0,8,0,2" />
+                    <TextBox Name="PasswordBox" PasswordChar="*" />
+                    <TextBlock Text="OTP" Margin="0,8,0,2" />
+                    <TextBox Name="OtpBox" />
+                    <CheckBox Content="Steam account" Name="SteamAccountCheck" Margin="0,12,0,0" />
+                    <CheckBox Content="Free trial" Name="FreeTrialCheck" Margin="0,2,0,0" />
+                    <Button Content="Login" Name="LoginButton" Click="OnLogin" Margin="0,12,0,0" />
+                </StackPanel>
+            </ScrollViewer>
 
         </Grid>
     </DockPanel>
