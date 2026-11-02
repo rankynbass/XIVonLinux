@@ -33,49 +33,35 @@ public partial class MainWindow : Window
 
         this.settingsService = new SettingsService();
         var s = this.settingsService.Settings;
-        ProtonPathBox.Text = s.ProtonPath;
-        PrefixPathBox.Text = s.PrefixPath;
-        GameLocationBox.Text = s.GameLocation;
-        PatchFolderBox.Text = s.PatchFolder;
         UsernameBox.Text = s.Username;
-        PasswordBox.Text = s.Password;
-        OtpBox.Text = s.OneTimePassword;
-        SteamAccountToggle.IsChecked = s.SteamAccount;
-        FreeTrialToggle.IsChecked = s.FreeTrial;
-        DalamudToggle.IsChecked = s.DalamudEnabled;
-
-        // Client language selector: persisted setting, drives the encrypted launch args
-        // (language=N), the gate login region, and Dalamud's Language field.
-        foreach (var l in new[] { "English", "Japanese", "German", "French" })
-            LanguageCombo.Items.Add(l);
-        LanguageCombo.SelectedItem = s.Language;
-        if (LanguageCombo.SelectedItem is null)
-            LanguageCombo.SelectedIndex = 0;
+        SteamAccountCheck.IsChecked = s.SteamAccount;
+        FreeTrialCheck.IsChecked = s.FreeTrial;
     }
 
-    /// <summary>The combo selection as the Common enum (falls back to English).</summary>
-    private ClientLanguage CurrentLanguage()
-        => Enum.TryParse<ClientLanguage>(LanguageCombo.SelectedItem as string, out var lang) ? lang : ClientLanguage.English;
+    // ---------- settings modal ----------
 
-    // ---------- folder pickers ----------
-
-    private async void OnBrowseProton(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => await PickFolderAsync(ProtonPathBox);
-
-    private async void OnBrowsePrefix(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => await PickFolderAsync(PrefixPathBox);
-
-    private async void OnBrowseGame(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => await PickFolderAsync(GameLocationBox);
-
-    private async void OnBrowsePatch(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => await PickFolderAsync(PatchFolderBox);
-
-    private async Task PickFolderAsync(TextBox box)
+    /// <summary>Modal settings window over the main page; Save persists and closes,
+    /// then the main page is refocused.</summary>
+    private async void OnSettings(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var folders = await this.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions());
-        if (folders.Count > 0)
-            box.Text = folders[0].Path.LocalPath;
+        var dlg = new SettingsWindow(this.settingsService);
+        await dlg.ShowDialog(this);
+        this.Focus();
+    }
+
+    // ---------- log box visibility ----------
+
+    private void OnToggleLog(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        StatusLog.IsVisible = !StatusLog.IsVisible;
+        // DockPanel measures an invisible docked child and reserves its 220px slot;
+        // collapsing Height to 0 keeps the window compact when the log is hidden, and
+        // SizeToContent grows/shrinks the window to match.
+        StatusLog.Height = StatusLog.IsVisible ? 220 : 0;
+        StatusLog.Margin = StatusLog.IsVisible ? new Avalonia.Thickness(0, 12, 0, 0) : new Avalonia.Thickness(0);
+        // Grow/shrink the window by the log's slot so hiding the log shrinks the window back.
+        this.Height = StatusLog.IsVisible ? 792 : 560;
+        LogToggleButton.Content = StatusLog.IsVisible ? "Hide log" : "Show log";
     }
 
     // ---------- login ----------
@@ -83,17 +69,11 @@ public partial class MainWindow : Window
     private void OnLogin(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         var s = this.settingsService.Settings;
-        s.ProtonPath = ProtonPathBox.Text;
-        s.PrefixPath = PrefixPathBox.Text;
-        s.GameLocation = GameLocationBox.Text;
-        s.PatchFolder = PatchFolderBox.Text;
         s.Username = UsernameBox.Text;
         s.Password = PasswordBox.Text;
         s.OneTimePassword = OtpBox.Text;
-        s.SteamAccount = SteamAccountToggle.IsChecked == true;
-        s.FreeTrial = FreeTrialToggle.IsChecked == true;
-        s.DalamudEnabled = DalamudToggle.IsChecked == true;
-        s.Language = LanguageCombo.SelectedItem as string ?? "English";
+        s.SteamAccount = SteamAccountCheck.IsChecked == true;
+        s.FreeTrial = FreeTrialCheck.IsChecked == true;
         this.settingsService.Save();
 
         StartPipeline(s.DalamudEnabled);
