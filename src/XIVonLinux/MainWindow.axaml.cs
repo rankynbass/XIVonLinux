@@ -30,6 +30,11 @@ public partial class MainWindow : Window
 
     private int activeLaunches;
     private readonly SettingsService settingsService;
+    /// <summary>Background Dalamud installer/updater (XIVLauncher.Common.Dalamud.DalamudUpdater).
+    /// Started at launcher startup: resolves the release version, downloads the injector +
+    /// .NET runtime into ~/.xivonlinux (dalamud/, runtime/, dalamudAssets/) as needed.
+    /// The login pipeline waits for State == Done before launching with the injector.</summary>
+    private readonly DalamudUpdater dalamudUpdater;
 
     public MainWindow()
     {
@@ -40,6 +45,16 @@ public partial class MainWindow : Window
         UsernameBox.Text = s.Username;
         SteamAccountCheck.IsChecked = s.SteamAccount;
         FreeTrialCheck.IsChecked = s.FreeTrial;
+
+        this.dalamudUpdater = new DalamudUpdater(NewsHttp,
+            this.settingsService.GetFolder("dalamud"),
+            this.settingsService.GetFolder("runtime"),
+            this.settingsService.GetFolder("dalamudAssets"),
+            null, null)
+        {
+            Overlay = new SilentDalamudOverlay(),
+        };
+        this.dalamudUpdater.Run(null, null);   // fire-and-forget background check/download
 
         StartNewsLoad();
     }
@@ -493,7 +508,10 @@ public partial class MainWindow : Window
 
                 Report($"Install complete: game ver {Repository.Ffxiv.GetVer(gamePath)}");
                 if (withDalamud)
+                {
+                    if (!await WaitForDalamudAsync()) return;
                     LaunchWithDansharing(prefix, service, gameExe, gamePath, installResult, lang, s.SteamAccount);
+                }
                 else
                     LaunchPlain(prefix, service, gamePath, installResult, lang, s.SteamAccount);
                 return;
@@ -530,7 +548,10 @@ public partial class MainWindow : Window
             }
 
             if (withDalamud)
+            {
+                if (!await WaitForDalamudAsync()) return;
                 LaunchWithDansharing(prefix, service, gameExe, gamePath, result, lang, s.SteamAccount);
+            }
             else
                 LaunchPlain(prefix, service, gamePath, result, lang, s.SteamAccount);
         }
@@ -578,16 +599,51 @@ public partial class MainWindow : Window
             Report("Launched ffxiv_dx11.exe via umu (pid not reported)");
     }
 
+    /// <summary>Blocks the login pipeline until the background Dalamud updater reaches
+    /// Done (injector + runtime downloaded/verified), reporting progress. On failure
+    /// (NoIntegrity after 10 tries, or 5 min timeout) the launch is aborted — the user
+    /// can retry, matching upstream's "hold for update" gate.</summary>
+    private async Task<bool> WaitForDalamudAsync()
+    {
+        var deadline = DateTime.UtcNow.AddMinutes(5);
+        var reportedStep = "";
+        Report("Checking Dalamud (background updater)...");
+        while (dalamudUpdater.State != DalamudUpdater.DownloadState.Done)
+        {
+            if (dalamudUpdater.State == DalamudUpdater.DownloadState.NoIntegrity)
+            {
+                Report($"Dalamud update failed: {dalamudUpdater.EnsurementException?.Message ?? "no integrity"}");
+                return false;
+            }
+            if (DateTime.UtcNow > deadline)
+            {
+                Report("Dalamud update timed out after 5 minutes.");
+                return false;
+            }
+            var step = dalamudUpdater.State.ToString();
+            if (step != reportedStep)
+            {
+                reportedStep = step;
+                Report($"Dalamud updater state: {step}");
+            }
+            await Task.Delay(1000);
+        }
+        if (!dalamudUpdater.Runner.Exists)
+        {
+            Report($"Dalamud injector missing at {dalamudUpdater.Runner.FullName}");
+            return false;
+        }
+        Report($"Dalamud ready: injector {dalamudUpdater.Runner.FullName}");
+        return true;
+    }
+
     /// <summary>In-prefix injector launch with the real login: the injector gets the
     /// encrypted game args (session, region, expansion, ver, UserPath); Run returns
     /// as soon as the injector's JSON arrives (game is up); game exit is watched
     /// off the UI thread.</summary>
     private void LaunchWithDansharing(UmuPrefix prefix, LoginService service, FileInfo gameExe, DirectoryInfo gamePath, XivGame.LoginResult result, ClientLanguage lang, bool isSteam)
     {
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var dalamudFiles = Path.Combine(home, "projects", "AI", "DalamudFiles");
-        var hooks = Path.Combine(dalamudFiles, "dalamud", "Hooks", "dev");
-        var injectorExe = new FileInfo(Path.Combine(hooks, "Dalamud.Injector.exe"));
+        var injectorExe = this.dalamudUpdater.Runner;
         if (!File.Exists(injectorExe.FullName))
         {
             Report($"FAIL: injector exe missing at {injectorExe.FullName}");
@@ -599,20 +655,21 @@ public partial class MainWindow : Window
 
         var startInfo = new DalamudStartInfo
         {
-            WorkingDirectory = hooks,
+            WorkingDirectory = injectorExe.Directory!.FullName,
             ConfigurationPath = Path.Combine(storage, "xivonlinux-dalamudConfig.json"),
             LoggingPath = logs,
             PluginDirectory = Path.Combine(storage, "installedPlugins"),
-            AssetDirectory = Path.Combine(dalamudFiles, "dalamudAssets", "447"),
+            AssetDirectory = this.dalamudUpdater.AssetDirectory!.FullName,
             Language = lang,
             DelayInitializeMs = 0,
         };
 
         // Wine .NET runtime for the in-prefix injector (M1-verified env shape; Wine-style paths).
-        var runtimeWine = prefix.UnixToWinePath(Path.Combine(storage, "runtime"));
+        var runtimeWine = prefix.UnixToWinePath(this.dalamudUpdater.Runtime.FullName);
         var envPairs = new List<(string, string)>
         {
             ("DOTNET_ROOT", runtimeWine),
+            ("DOTNET_ROOT_X64", runtimeWine),
             ("WINEDOTNET_ROOT", runtimeWine),
             ("DALAMUD_RUNTIME", runtimeWine),
         };
