@@ -2,7 +2,7 @@
     x:Class="XIVonLinux.MainWindow"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Width="900"
+    Width="950"
     Height="560"
     Title="XIVonLinux">
     <DockPanel Margin="20">
@@ -15,22 +15,23 @@
 
         <!-- Left panel swaps between news (default) and the log box; the login side
              (username/password/OTP/login) is never hidden -->
-        <Grid ColumnDefinitions="2*,*" RowDefinitions="*">
+        <!-- News frame has the lowest layout priority: the login column keeps its width
+             (Auto), the news column takes the rest and shrinks first; its content scrolls. -->
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="*">
 
-            <Grid Grid.Row="0" Grid.Column="0" Margin="0,0,12,0">
+            <Grid Grid.Row="0" Grid.Column="0" MinWidth="180" Margin="0,0,12,0">
                 <!-- A. News banner + headlines: visible while the log is hidden -->
                 <Border Name="NewsPanel"
                         BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" CornerRadius="4">
-                    <StackPanel Margin="12">
-                        <Border Background="#1B2A3A" CornerRadius="4" Padding="10,8">
-                            <TextBlock Text="NEWS BANNER" FontSize="20" FontWeight="Bold" />
-                        </Border>
-                        <StackPanel Margin="0,10,0,0" Spacing="6">
-                            <TextBlock Text="Headline placeholder" FontWeight="Bold" />
-                            <TextBlock Text="Headline placeholder" FontWeight="Bold" />
-                            <TextBlock Text="Headline placeholder" FontWeight="Bold" />
+                    <ScrollViewer Name="NewsScroll" HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Visible">
+                        <StackPanel Margin="12" Spacing="8">
+                            <TextBlock Name="NewsLoadingText" Text="Loading news..." />
+                            <Image Name="BannerImage" IsVisible="False" MaxWidth="640" MaxHeight="250"
+                                   Stretch="Uniform" />
+                            <StackPanel Name="NewsList" Spacing="4" />
                         </StackPanel>
-                    </StackPanel>
+                    </ScrollViewer>
                 </Border>
 
                 <!-- Log box: replaces the news area when shown -->
@@ -39,7 +40,7 @@
             </Grid>
 
             <!-- B. Login section -->
-            <StackPanel Grid.Row="0" Grid.Column="1" Spacing="6">
+            <StackPanel Grid.Row="0" Grid.Column="1" MinWidth="200" Spacing="6">
                 <TextBlock Text="Username" Margin="0,0,0,2" />
                 <TextBox Name="UsernameBox" />
                 <TextBlock Text="Password" Margin="0,8,0,2" />

@@ -60,6 +60,14 @@ public sealed class LoginService : IDisposable
         }
     }
 
+    /// <summary>News headlines + rotating banners from the frontier API, in the UI language.</summary>
+    public async Task<(Headlines, IReadOnlyList<Banner>)> GetNewsAsync()
+    {
+        var banners = await Headlines.GetBanners(launcher, language);
+        var headlines = await Headlines.GetNews(launcher, language);
+        return (headlines, banners);
+    }
+
     /// <summary>
     /// Login: Steam-account path (isSteam=true — Steamworks auth ticket via
     /// SteamClient.Init(39210/312060 for free trial) + Ticket.Get) or SE credentials

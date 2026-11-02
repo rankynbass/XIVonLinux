@@ -1,12 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Serilog;
@@ -36,6 +40,8 @@ public partial class MainWindow : Window
         UsernameBox.Text = s.Username;
         SteamAccountCheck.IsChecked = s.SteamAccount;
         FreeTrialCheck.IsChecked = s.FreeTrial;
+
+        StartNewsLoad();
     }
 
     // ---------- settings modal ----------
@@ -88,6 +94,108 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Log to Serilog (console/file) and mirror the line into the UI status box.</summary>
+    // ---------- news frame ----------
+
+    private const int BANNER_TIME_MS = 8000;
+    private static readonly HttpClient NewsHttp = new();
+
+    private List<Banner> bannerList = new();
+    private Bitmap[] bannerBitmaps = [];
+    private int currentBanner;
+    private LoginService? newsService;
+    private DispatcherTimer? bannerTimer;
+
+    /// Fetches headlines + banners via the launcher frontier API, loads banner images,
+    /// then shows them on the UI thread (NewsFrame shape from XIVLauncher.Core).
+    private void StartNewsLoad()
+    {
+        newsService = new LoginService(settingsService, null!, ClientLanguage.English);
+        var svc = newsService;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var (headlines, banners) = await svc.GetNewsAsync();
+
+                var bitmaps = new List<Bitmap>();
+                foreach (var b in banners)
+                {
+                    var bytes = await NewsHttp.GetByteArrayAsync(b.LsbBanner);
+                    bitmaps.Add(await Dispatcher.UIThread.InvokeAsync(() => new Bitmap(new MemoryStream(bytes))));
+                }
+
+                Dispatcher.UIThread.Post(() => ShowNews(headlines, banners, bitmaps));
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "News load failed");
+                Dispatcher.UIThread.Post(() => NewsLoadingText.Text = "News unavailable");
+            }
+        });
+    }
+
+    private void ShowNews(Headlines headlines, IReadOnlyList<Banner> banners, List<Bitmap> bitmaps)
+    {
+        NewsLoadingText.IsVisible = false;
+        NewsList.Children.Clear();
+
+        if (bitmaps.Count > 0)
+        {
+            bannerList = banners.ToList();
+            bannerBitmaps = bitmaps.ToArray();
+            BannerImage.IsVisible = true;
+            BannerImage.Source = bannerBitmaps[0];
+            BannerImage.Cursor = new Cursor(StandardCursorType.Hand);
+            BannerImage.PointerPressed += (_, _) =>
+            {
+                var link = bannerList[currentBanner].Link;
+                if (link != null) OpenUrl(link.ToString());
+            };
+
+            bannerTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(BANNER_TIME_MS) };
+            bannerTimer.Tick += (_, _) =>
+            {
+                currentBanner = (currentBanner + 1) % bannerBitmaps.Length;
+                BannerImage.Source = bannerBitmaps[currentBanner];
+            };
+            bannerTimer.Start();
+        }
+
+        AddNewsCaption("News");
+        foreach (var n in headlines.News) AddNewsEntry(n.Title, n.Url);
+
+        if (headlines.Topics.Length > 0)
+        {
+            AddNewsCaption("Topics");
+            foreach (var t in headlines.Topics) AddNewsEntry(t.Title, t.Url);
+        }
+    }
+
+    private void AddNewsCaption(string caption)
+    {
+        NewsList.Children.Add(new TextBlock { Text = caption, FontWeight = FontWeight.Bold, Margin = new Thickness(0, 6, 0, 2) });
+    }
+
+    private void AddNewsEntry(string title, string url)
+    {
+        var tb = new TextBlock { Text = title, TextWrapping = TextWrapping.Wrap, Cursor = new Cursor(StandardCursorType.Hand) };
+        tb.PointerPressed += (_, _) => OpenUrl(url);
+        NewsList.Children.Add(tb);
+    }
+
+    private static void OpenUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo("xdg-open", url) { UseShellExecute = false });
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Could not open {Url}", url);
+        }
+    }
+
     private void Report(string line)
     {
         Log.Information(line);
