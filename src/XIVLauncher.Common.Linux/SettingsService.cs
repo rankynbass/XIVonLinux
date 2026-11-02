@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text;
+using Serilog;
 using Tomlyn;
 using Tomlyn.Model;
 using Tomlyn.Serialization;
@@ -44,6 +45,9 @@ public sealed class SettingsService
         this.storage = new Storage("xivonlinux");
         this.Settings = Load();
         ApplyDefaults();
+        // Fresh copy on disk after missing/malformed/quarantined settings (and any
+        // newly defaulted entries); a no-op write when the file is already complete.
+        Save();
     }
 
     public LaunchSettings Settings { get; private set; }
@@ -82,11 +86,30 @@ public sealed class SettingsService
         if (!File.Exists(file.FullName))
             return s;
 
-        var model = TomlSerializer.Deserialize<TomlTable>(File.ReadAllText(file.FullName));
+        TomlTable model;
+        try
+        {
+            model = TomlSerializer.Deserialize<TomlTable>(File.ReadAllText(file.FullName));
+        }
+        catch (Exception ex)
+        {
+            // Malformed TOML must not crash the launcher: quarantine the file as
+            // settings.toml.bad (numbered on collision) and start from defaults;
+            // ApplyDefaults + the startup Save() write a fresh settings.toml.
+            Log.Error(ex, "settings.toml is malformed; quarantining as settings.toml.bad");
+            var badPath = Path.Combine(file.DirectoryName!, "settings.toml.bad");
+            var n = 1;
+            while (File.Exists(badPath))
+                badPath = Path.Combine(file.DirectoryName!, $"settings.toml.bad.{n++}");
+            File.Move(file.FullName, badPath);
+            return s;
+        }
+
         // TomlTable indexer throws on missing keys (older settings files lack newer
-        // keys like prefix_path), so look keys up via ContainsKey.
+        // keys like prefix_path/config_path), so look keys up via ContainsKey; a key
+        // that is present but the wrong type falls back to the property default.
         string? Get(string key) => model.ContainsKey(key) ? model[key] as string : null;
-        bool GetBool(string key) => model.ContainsKey(key) && model[key] is bool b ? b : false;
+        bool GetBool(string key, bool def) => model.ContainsKey(key) && model[key] is bool b ? b : def;
 
         if (Get("proton_path") is string pp) s.ProtonPath = pp;
         if (Get("prefix_path") is string px) s.PrefixPath = px;
@@ -94,9 +117,9 @@ public sealed class SettingsService
         if (Get("patch_folder") is string pf) s.PatchFolder = pf;
         if (Get("config_path") is string cp) s.ConfigPath = cp;
         if (Get("username") is string un) s.Username = un;
-        s.SteamAccount = GetBool("steam_account");
-        s.FreeTrial = GetBool("free_trial");
-        s.DalamudEnabled = GetBool("dalamud_enabled");
+        s.SteamAccount = GetBool("steam_account", s.SteamAccount);
+        s.FreeTrial = GetBool("free_trial", s.FreeTrial);
+        s.DalamudEnabled = GetBool("dalamud_enabled", s.DalamudEnabled);
         if (Get("language") is string lg) s.Language = lg;
         return s;
     }
