@@ -53,14 +53,9 @@ public partial class MainWindow : Window
 
     private void OnToggleLog(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        // The log replaces the news panel (login side stays put); window size is fixed.
         StatusLog.IsVisible = !StatusLog.IsVisible;
-        // DockPanel measures an invisible docked child and reserves its 220px slot;
-        // collapsing Height to 0 keeps the window compact when the log is hidden, and
-        // SizeToContent grows/shrinks the window to match.
-        StatusLog.Height = StatusLog.IsVisible ? 220 : 0;
-        StatusLog.Margin = StatusLog.IsVisible ? new Avalonia.Thickness(0, 12, 0, 0) : new Avalonia.Thickness(0);
-        // Grow/shrink the window by the log's slot so hiding the log shrinks the window back.
-        this.Height = StatusLog.IsVisible ? 792 : 560;
+        NewsPanel.IsVisible = !StatusLog.IsVisible;
         LogToggleButton.Content = StatusLog.IsVisible ? "Hide log" : "Show log";
     }
 
