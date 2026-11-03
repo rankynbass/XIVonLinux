@@ -7,7 +7,7 @@ using Tomlyn.Model;
 using Tomlyn.Serialization;
 using XIVLauncher.Common;
 
-namespace XIVLauncher.Common.Linux;
+namespace XIVonLinux;
 
 /// <summary>
 /// User-configurable launcher settings, persisted as ~/.xivonlinux/settings.toml
@@ -54,6 +54,10 @@ public sealed class SettingsService
 
     /// <summary>The ~/.xivonlinux root, created on first use.</summary>
     public DirectoryInfo Root => this.storage.Root;
+
+    /// <summary>The XIVLauncher.Common storage; passed to library services as values
+    /// (GetFile/GetFolder), not as the settings object.</summary>
+    public Storage Storage => this.storage;
 
     /// <summary>A subfolder of ~/.xivonlinux, created if missing (e.g. "patches").</summary>
     public DirectoryInfo GetFolder(string name) => this.storage.GetFolder(name);

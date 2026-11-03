@@ -124,7 +124,7 @@ public partial class MainWindow : Window
     /// then shows them on the UI thread (NewsFrame shape from XIVLauncher.Core).
     private void StartNewsLoad()
     {
-        newsService = new LoginService(settingsService, null!, ClientLanguage.English);
+        newsService = new LoginService(settingsService.Storage, settingsService.Settings.ConfigPath, null!, ClientLanguage.English);
         var svc = newsService;
 
         _ = Task.Run(async () =>
@@ -435,7 +435,7 @@ public partial class MainWindow : Window
             Report("Prefix ready");
 
             var lang = Enum.TryParse<ClientLanguage>(s.Language, out var l) ? l : ClientLanguage.English;
-            service = new LoginService(this.settingsService, prefix, lang);
+            service = new LoginService(this.settingsService.Storage, this.settingsService.Settings.ConfigPath, prefix, lang);
             Report($"Client language: {lang}");
 
             Report("Checking login gate ...");
@@ -479,7 +479,7 @@ public partial class MainWindow : Window
                 if (bootPatches.Length > 0)
                 {
                     await Dispatcher.UIThread.InvokeAsync(() => OpenProgressPopup("Installing boot patches"));
-                    var okBoot = await service.InstallPatchesAsync(Repository.Boot, bootPatches, string.Empty, s, Report);
+                    var okBoot = await service.InstallPatchesAsync(Repository.Boot, bootPatches, string.Empty, s.GameLocation, s.PatchFolder, Report);
                     await Dispatcher.UIThread.InvokeAsync(() => CloseProgressPopup());
                     if (!okBoot)
                     {
@@ -489,7 +489,7 @@ public partial class MainWindow : Window
                 }
 
                 Report($"Install step 2: login with base game version report (steam: {s.SteamAccount}, free trial: {s.FreeTrial})");
-                var installResult = await service.LoginAsync(s, gamePath, forceBaseVersion: true);
+                var installResult = await service.LoginAsync(new LoginRequest { Username = s.Username, Password = s.Password, OneTimePassword = s.OneTimePassword, SteamAccount = s.SteamAccount, FreeTrial = s.FreeTrial }, gamePath, forceBaseVersion: true);
                 Report($"Install login state: {installResult.State}");
                 if (installResult.State != XivGame.LoginState.NeedsPatchGame)
                 {
@@ -498,7 +498,7 @@ public partial class MainWindow : Window
                 }
 
                 await Dispatcher.UIThread.InvokeAsync(() => OpenProgressPopup("Installing game patches"));
-                var okAll = await service.InstallPatchesAsync(Repository.Ffxiv, installResult.PendingPatches, installResult.UniqueId ?? string.Empty, s, Report);
+                var okAll = await service.InstallPatchesAsync(Repository.Ffxiv, installResult.PendingPatches, installResult.UniqueId ?? string.Empty, s.GameLocation, s.PatchFolder, Report);
                 await Dispatcher.UIThread.InvokeAsync(() => CloseProgressPopup());
                 if (!okAll)
                 {
@@ -518,7 +518,7 @@ public partial class MainWindow : Window
             }
 
             Report($"Logging in as {s.Username} (steam: {s.SteamAccount}, free trial: {s.FreeTrial})");
-            var result = await service.LoginAsync(s, gamePath);
+            var result = await service.LoginAsync(new LoginRequest { Username = s.Username, Password = s.Password, OneTimePassword = s.OneTimePassword, SteamAccount = s.SteamAccount, FreeTrial = s.FreeTrial }, gamePath);
             Report($"Login state: {result.State}");
 
             switch (result.State)
@@ -536,7 +536,7 @@ public partial class MainWindow : Window
                     Report($"Server returned {result.PendingPatches.Length} game patch(es)");
                     if (result.PendingPatches.Length > 0)
                         await Dispatcher.UIThread.InvokeAsync(() => OpenProgressPopup("Installing game patches"));
-                    var ok = await service.PatchAsync(result, s, Report);
+                    var ok = await service.PatchAsync(result, s.GameLocation, Report);
                     await Dispatcher.UIThread.InvokeAsync(() => CloseProgressPopup());
                     if (!ok)
                     {

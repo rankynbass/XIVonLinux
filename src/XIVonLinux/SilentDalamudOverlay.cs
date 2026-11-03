@@ -1,6 +1,6 @@
 using XIVLauncher.Common.PlatformAbstractions;
 
-namespace XIVLauncher.Common.Linux;
+namespace XIVonLinux;
 
 /// <summary>No-op overlay for the UI-less launcher: DalamudUpdater.SetOverlayProgress
 /// dereferences Overlay unconditionally, so an updater without an overlay object throws

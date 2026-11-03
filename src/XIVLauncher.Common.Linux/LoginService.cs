@@ -32,14 +32,18 @@ public sealed class LoginService : IDisposable
     private const string FrontierUrlTemplate = "https://sqex-fragment.legacy.net/v650/index.html?rc_lang=en&time={1}";
 
     private readonly Launcher launcher;
-    private readonly SettingsService settingsService;
+    private readonly Storage storage;
+    private readonly string configPath;
     private readonly UmuPrefix prefix;
     private readonly ClientLanguage language;
     private AriaPatchAcquisition? acquisition;
 
-    public LoginService(SettingsService settings, UmuPrefix prefix, ClientLanguage language = ClientLanguage.English)
+    /// <summary>Library-side service: takes plain values (XIVLauncher.Common.Storage,
+    /// the character-config folder path), never the app's settings object.</summary>
+    public LoginService(Storage storage, string configPath, UmuPrefix prefix, ClientLanguage language = ClientLanguage.English)
     {
-        this.settingsService = settings;
+        this.storage = storage;
+        this.configPath = configPath;
         this.prefix = prefix;
         this.language = language;
         this.launcher = new Launcher(new SteamworksSteam(), new NullUniqueIdCache(), FrontierUrlTemplate, "en");
@@ -96,12 +100,12 @@ public sealed class LoginService : IDisposable
         return null;
     }
 
-    public async Task<Launcher.LoginResult> LoginAsync(LaunchSettings settings, DirectoryInfo gamePath, bool forceBaseVersion = false)
+    public async Task<Launcher.LoginResult> LoginAsync(LoginRequest request, DirectoryInfo gamePath, bool forceBaseVersion = false)
     {
         return await launcher.Login(
-            settings.Username, settings.Password, settings.OneTimePassword,
-            settings.SteamAccount, useCache: false, gamePath, forceBaseVersion,
-            settings.FreeTrial, language);
+            request.Username, request.Password, request.OneTimePassword,
+            request.SteamAccount, useCache: false, gamePath, forceBaseVersion,
+            request.FreeTrial, language);
     }
 
     /// <summary>Boot patch list for an (empty) install: CheckBootVersion with
@@ -185,13 +189,13 @@ public sealed class LoginService : IDisposable
         CurrentPatcher?.StartCancellation();
     }
 
-    public async Task<bool> InstallPatchesAsync(Repository repo, PatchListEntry[] patches, string uid, LaunchSettings settings, Action<string> status)
+    public async Task<bool> InstallPatchesAsync(Repository repo, PatchListEntry[] patches, string uid, string gameLocation, string patchFolder, Action<string> status)
     {
-        var gamePath = new DirectoryInfo(settings.GameLocation);
-        var patchStore = new DirectoryInfo(settings.PatchFolder);
+        var gamePath = new DirectoryInfo(gameLocation);
+        var patchStore = new DirectoryInfo(patchFolder);
         Directory.CreateDirectory(patchStore.FullName);
 
-        var logFile = settingsService.GetFile("aria2.log");
+        var logFile = storage.GetFile("aria2.log");
 
         if (acquisition is null)
         {
@@ -225,10 +229,10 @@ public sealed class LoginService : IDisposable
     /// (Aria2 RPC acquisition in ~/.xivonlinux/patches, in-process installer writing
     /// into the game folder). status receives human-readable progress lines.
     /// </summary>
-    public async Task<bool> PatchAsync(Launcher.LoginResult loginResult, LaunchSettings settings, Action<string> status)
+    public async Task<bool> PatchAsync(Launcher.LoginResult loginResult, string gameLocation, Action<string> status)
     {
         return await InstallPatchesAsync(Repository.Ffxiv, loginResult.PendingPatches,
-            loginResult.UniqueId ?? string.Empty, settings, status);
+            loginResult.UniqueId ?? string.Empty, gameLocation, storage.GetFolder("patches").FullName, status);
     }
 
     /// <summary>
@@ -272,7 +276,7 @@ public sealed class LoginService : IDisposable
     /// </summary>
     public async Task<bool> DownloadPatchAsync(PatchListEntry patch, DirectoryInfo targetDir, Action<string> status)
     {
-        var logFile = settingsService.GetFile("aria2.log");
+        var logFile = storage.GetFile("aria2.log");
         acquisition = new AriaPatchAcquisition(logFile);
         await acquisition.StartIfNeededAsync(0); // no speed limit
 
@@ -436,12 +440,11 @@ public sealed class LoginService : IDisposable
         return builder.BuildEncrypted();
     }
 
-    /// <summary>Game config folder (character data): settings ConfigPath, default
-    /// ~/.xivonlinux/ffxivConfig (upstream storage.GetFolder("ffxivConfig")); created
-    /// on first use.</summary>
+    /// <summary>Game config folder (character data): the configPath value passed to the
+    /// constructor (app default: ~/.xivonlinux/ffxivConfig); created on first use.</summary>
     public DirectoryInfo GameConfigFolder()
     {
-        var dir = new DirectoryInfo(settingsService.Settings.ConfigPath);
+        var dir = new DirectoryInfo(configPath);
         dir.Create();
         return dir;
     }
