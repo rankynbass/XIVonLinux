@@ -31,8 +31,13 @@ public sealed class UmuPrefix
     /// the Steam/compat launch convention (space-free paths, see SteamLocator).</summary>
     public string? SteamCompatMounts { get; }
 
+    /// <summary>Optional WINEDLLOVERRIDES string (e.g. the DXVK preset + user extras);
+    /// null/empty means the variable is not set.</summary>
+    public string? WineDllOverrides { get; }
+
     public UmuPrefix(DirectoryInfo prefixDir, string steamCompatDataPath, string steamCompatInstallPath,
-        string gameId = "umu-steam", string? protonPath = null, string? steamCompatMounts = null)
+        string gameId = "umu-steam", string? protonPath = null, string? steamCompatMounts = null,
+        string? wineDllOverrides = null)
     {
         PrefixDir = prefixDir;
         SteamCompatDataPath = steamCompatDataPath;
@@ -40,6 +45,7 @@ public sealed class UmuPrefix
         GameId = gameId;
         ProtonPath = protonPath;
         SteamCompatMounts = steamCompatMounts;
+        WineDllOverrides = wineDllOverrides;
     }
 
     public bool Exists => PrefixDir.Exists;
@@ -64,6 +70,8 @@ public sealed class UmuPrefix
             env["PROTONPATH"] = ProtonPath;
         if (!string.IsNullOrEmpty(SteamCompatMounts))
             env["STEAM_COMPAT_MOUNTS"] = SteamCompatMounts;
+        if (!string.IsNullOrEmpty(WineDllOverrides))
+            env["WINEDLLOVERRIDES"] = WineDllOverrides;
         return env;
     }
 

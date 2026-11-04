@@ -43,6 +43,9 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        // Title bar carries the assembly version injected by VersionSourceGenerator.
+        Title = $"XIVonLinux {AppUtil.VersionInfo.Instance().Version.FileVersion}";
+
         this.settingsService = new SettingsService();
         this.accounts = new AccountManager(this.settingsService);
         var s = this.settingsService.Settings;
@@ -566,7 +569,7 @@ public partial class MainWindow : Window
                 : s.PrefixPath;
             Directory.CreateDirectory(prefixRoot);
 
-            var gamePath = new DirectoryInfo(s.GameLocation);
+            var gamePath = new DirectoryInfo(s.GamePath);
             var gameExe = new FileInfo(Path.Combine(gamePath.FullName, "game", "ffxiv_dx11.exe"));
             var gameInstalled = File.Exists(gameExe.FullName);
             Report($"Game location: {gamePath.FullName}");
@@ -579,6 +582,15 @@ public partial class MainWindow : Window
             }
             Report($"Proton: {Path.GetFileName(proton.TrimEnd('/', '\\'))}");
 
+            // WINEDLLOVERRIDES: exact DXVK preset per the Enable DXVK setting, with the
+            // user's extra overrides appended (joined with ';' when non-empty).
+            var dxvkPreset = s.EnableDxvk
+                ? "msquic=,mscoree=n,b;d3d9,d3d11,d3d10core,dxgi=n,b"
+                : "msquic=,mscoree=n,b;d3d9,d3d11,d3d10core,dxgi=b";
+            var winedllOverrides = string.IsNullOrEmpty(s.ExtraWineDllOverrides)
+                ? dxvkPreset
+                : dxvkPreset + ";" + s.ExtraWineDllOverrides;
+
             // GE/Proton convention: WINEPREFIX is the compatdata ROOT, proton appends pfx/.
             var prefix = new UmuPrefix(
                 new DirectoryInfo(Path.Combine(prefixRoot, "pfx")),
@@ -586,8 +598,10 @@ public partial class MainWindow : Window
                 gamePath.FullName,
                 "umu-steam",
                 proton,
-                gamePath.FullName);
+                gamePath.FullName,
+                winedllOverrides);
             Report($"Prefix root: {prefixRoot}");
+            Report($"WINEDLLOVERRIDES: {winedllOverrides}");
 
             Report("Ensuring prefix (create + bootstrap) — first run can take a few minutes");
             new UmuCommandRunner(prefix).EnsurePrefix();
@@ -638,7 +652,7 @@ public partial class MainWindow : Window
                 if (bootPatches.Length > 0)
                 {
                     await Dispatcher.UIThread.InvokeAsync(() => OpenProgressPopup("Installing boot patches"));
-                    var okBoot = await service.InstallPatchesAsync(Repository.Boot, bootPatches, string.Empty, s.GameLocation, s.PatchFolder, Report);
+                    var okBoot = await service.InstallPatchesAsync(Repository.Boot, bootPatches, string.Empty, s.GamePath, s.PatchPath, Report);
                     await Dispatcher.UIThread.InvokeAsync(() => CloseProgressPopup());
                     if (!okBoot)
                     {
@@ -657,7 +671,7 @@ public partial class MainWindow : Window
                 }
 
                 await Dispatcher.UIThread.InvokeAsync(() => OpenProgressPopup("Installing game patches"));
-                var okAll = await service.InstallPatchesAsync(Repository.Ffxiv, installResult.PendingPatches, installResult.UniqueId ?? string.Empty, s.GameLocation, s.PatchFolder, Report);
+                var okAll = await service.InstallPatchesAsync(Repository.Ffxiv, installResult.PendingPatches, installResult.UniqueId ?? string.Empty, s.GamePath, s.PatchPath, Report);
                 await Dispatcher.UIThread.InvokeAsync(() => CloseProgressPopup());
                 if (!okAll)
                 {
@@ -703,7 +717,7 @@ public partial class MainWindow : Window
                     Report($"Server returned {result.PendingPatches.Length} game patch(es)");
                     if (result.PendingPatches.Length > 0)
                         await Dispatcher.UIThread.InvokeAsync(() => OpenProgressPopup("Installing game patches"));
-                    var ok = await service.PatchAsync(result, s.GameLocation, Report);
+                    var ok = await service.PatchAsync(result, s.GamePath, Report);
                     await Dispatcher.UIThread.InvokeAsync(() => CloseProgressPopup());
                     if (!ok)
                     {

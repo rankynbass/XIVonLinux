@@ -11,29 +11,41 @@ namespace XIVonLinux;
 
 /// <summary>
 /// User-configurable launcher settings, persisted as ~/.xivonlinux/settings.toml
-/// via XIVLauncher.Common.Storage("xivonlinux") so config, patches and dalamud
-/// data live separate from the legacy ~/.xlcore. Credentials are NOT persisted
-/// to disk — Password/OTP are UI-only fields, cleared on save.
+/// via XIVLauncher.Common.Storage("xivonlinux"), split into [game], [proton],
+/// [dalamud] and [login] sections. Credentials are NOT persisted to disk —
+/// Password/OTP are UI-only fields, cleared on save.
 /// </summary>
 public sealed class LaunchSettings
 {
+    // Game tab
+    public string GamePath { get; set; } = "";        // game install folder
+    public string ConfigPath { get; set; } = "";      // character data folder (ffxivConfig)
+    public string PatchPath { get; set; } = "";       // downloaded patches folder
+    public string Language { get; set; } = "English"; // game client language: Japanese/English/German/French
+
+    // Proton tab
     public string ProtonPath { get; set; } = "";
-    public string PrefixPath { get; set; } = "";   // WINEPREFIX root; prefix dir = {PrefixPath}/pfx
-    public string GameLocation { get; set; } = "";
-    public string PatchFolder { get; set; } = "";
-    public string ConfigPath { get; set; } = "";   // character data folder (ffxivConfig)
+    public string PrefixPath { get; set; } = "";      // WINEPREFIX root; prefix dir = {PrefixPath}/pfx
+    public bool EnableDxvk { get; set; } = true;       // DXVK preset for WINEDLLOVERRIDES
+    public string ExtraWineDllOverrides { get; set; } = ""; // appended after the DXVK preset
+
+    // Dalamud tab
+    public bool DalamudEnabled { get; set; } = true;
+
+    // Login (not a tab; persisted alongside the tabs)
     public string Username { get; set; } = "";
-    public string Password { get; set; } = "";   // UI-only, never persisted
+    public string Password { get; set; } = "";        // UI-only, never persisted
     public string OneTimePassword { get; set; } = ""; // UI-only, never persisted
     public bool SteamAccount { get; set; } = true;
     public bool FreeTrial { get; set; }
-    public bool DalamudEnabled { get; set; } = true;
-    public string Language { get; set; } = "English";   // game client language: Japanese/English/German/French
-    public string? CurrentAccountId { get; set; }   // accounts.toml account the launcher pre-selects
+    public string? CurrentAccountId { get; set; }     // accounts.toml account the launcher pre-selects
 }
 
 /// <summary>
-/// Loads/saves LaunchSettings with Tomlyn. Toml keys are snake_case.
+/// Loads/saves LaunchSettings with Tomlyn. settings.toml is sectioned to match the
+/// tabbed settings UI: [game], [proton], [dalamud], [login]; keys are snake_case.
+/// A section absent from an older flat settings.toml falls back to the legacy
+/// top-level key, so existing settings survive the format change.
 /// Defaults: Proton = GE-Proton 11-6 under Steam compatibilitytools.d,
 /// Game = ~/Games/final-fantasy-xiv, Patches = the storage 'patches' folder.
 /// </summary>
@@ -69,16 +81,29 @@ public sealed class SettingsService
     public void Save()
     {
         var sb = new StringBuilder();
+
+        sb.AppendLine("[game]");
+        sb.AppendLine($"game_path = {TomlString(this.Settings.GamePath)}");
+        sb.AppendLine($"config_path = {TomlString(this.Settings.ConfigPath)}");
+        sb.AppendLine($"patch_path = {TomlString(this.Settings.PatchPath)}");
+        sb.AppendLine($"language = {TomlString(this.Settings.Language)}");
+        sb.AppendLine();
+
+        sb.AppendLine("[proton]");
         sb.AppendLine($"proton_path = {TomlString(this.Settings.ProtonPath)}");
         sb.AppendLine($"prefix_path = {TomlString(this.Settings.PrefixPath)}");
-        sb.AppendLine($"game_location = {TomlString(this.Settings.GameLocation)}");
-        sb.AppendLine($"patch_folder = {TomlString(this.Settings.PatchFolder)}");
-        sb.AppendLine($"config_path = {TomlString(this.Settings.ConfigPath)}");
+        sb.AppendLine($"enable_dxvk = {this.Settings.EnableDxvk.ToString().ToLowerInvariant()}");
+        sb.AppendLine($"extra_wine_dll_overrides = {TomlString(this.Settings.ExtraWineDllOverrides)}");
+        sb.AppendLine();
+
+        sb.AppendLine("[dalamud]");
+        sb.AppendLine($"enabled = {this.Settings.DalamudEnabled.ToString().ToLowerInvariant()}");
+        sb.AppendLine();
+
+        sb.AppendLine("[login]");
         sb.AppendLine($"username = {TomlString(this.Settings.Username)}");
         sb.AppendLine($"steam_account = {this.Settings.SteamAccount.ToString().ToLowerInvariant()}");
         sb.AppendLine($"free_trial = {this.Settings.FreeTrial.ToString().ToLowerInvariant()}");
-        sb.AppendLine($"dalamud_enabled = {this.Settings.DalamudEnabled.ToString().ToLowerInvariant()}");
-        sb.AppendLine($"language = {TomlString(this.Settings.Language)}");
         if (!string.IsNullOrEmpty(this.Settings.CurrentAccountId))
             sb.AppendLine($"current_account = {TomlString(this.Settings.CurrentAccountId)}");
 
@@ -112,23 +137,52 @@ public sealed class SettingsService
             return s;
         }
 
-        // TomlTable indexer throws on missing keys (older settings files lack newer
-        // keys like prefix_path/config_path), so look keys up via ContainsKey; a key
-        // that is present but the wrong type falls back to the property default.
-        string? Get(string key) => model.ContainsKey(key) ? model[key] as string : null;
-        bool GetBool(string key, bool def) => model.ContainsKey(key) && model[key] is bool b ? b : def;
+        // Sectioned keys; TomlTable indexer throws on missing keys, so look keys up
+        // via ContainsKey. A key present with the wrong type, and a missing section,
+        // fall back to the legacy flat top-level key, then to the property default —
+        // pre-section settings.toml files migrate on the next Save().
+        TomlTable? Sec(string name) => model.ContainsKey(name) && model[name] is TomlTable t ? t : null;
 
-        if (Get("proton_path") is string pp) s.ProtonPath = pp;
-        if (Get("prefix_path") is string px) s.PrefixPath = px;
-        if (Get("game_location") is string gl) s.GameLocation = gl;
-        if (Get("patch_folder") is string pf) s.PatchFolder = pf;
-        if (Get("config_path") is string cp) s.ConfigPath = cp;
-        if (Get("username") is string un) s.Username = un;
-        s.SteamAccount = GetBool("steam_account", s.SteamAccount);
-        s.FreeTrial = GetBool("free_trial", s.FreeTrial);
-        s.DalamudEnabled = GetBool("dalamud_enabled", s.DalamudEnabled);
-        if (Get("language") is string lg) s.Language = lg;
-        if (Get("current_account") is string ca) s.CurrentAccountId = ca;
+        string? Get(TomlTable? sec, string key, string legacyKey)
+        {
+            if (sec is not null && sec.ContainsKey(key) && sec[key] is string v)
+                return v;
+            if (model.ContainsKey(legacyKey) && model[legacyKey] is string lv)
+                return lv;
+            return null;
+        }
+
+        bool GetBool(TomlTable? sec, string key, string legacyKey, bool def)
+        {
+            if (sec is not null && sec.ContainsKey(key) && sec[key] is bool b)
+                return b;
+            if (model.ContainsKey(legacyKey) && model[legacyKey] is bool lb)
+                return lb;
+            return def;
+        }
+
+        var game = Sec("game");
+        var proton = Sec("proton");
+        var dalamud = Sec("dalamud");
+        var login = Sec("login");
+
+        if (Get(game, "game_path", "game_location") is string gp) s.GamePath = gp;
+        if (Get(game, "config_path", "config_path") is string cp) s.ConfigPath = cp;
+        if (Get(game, "patch_path", "patch_folder") is string pp) s.PatchPath = pp;
+        if (Get(game, "language", "language") is string lg) s.Language = lg;
+
+        if (Get(proton, "proton_path", "proton_path") is string pt) s.ProtonPath = pt;
+        if (Get(proton, "prefix_path", "prefix_path") is string px) s.PrefixPath = px;
+        s.EnableDxvk = GetBool(proton, "enable_dxvk", "enable_dxvk", s.EnableDxvk);
+        if (Get(proton, "extra_wine_dll_overrides", "extra_wine_dll_overrides") is string xw) s.ExtraWineDllOverrides = xw;
+
+        s.DalamudEnabled = GetBool(dalamud, "enabled", "dalamud_enabled", s.DalamudEnabled);
+
+        if (Get(login, "username", "username") is string un) s.Username = un;
+        s.SteamAccount = GetBool(login, "steam_account", "steam_account", s.SteamAccount);
+        s.FreeTrial = GetBool(login, "free_trial", "free_trial", s.FreeTrial);
+        if (Get(login, "current_account", "current_account") is string ca) s.CurrentAccountId = ca;
+
         return s;
     }
 
@@ -143,11 +197,11 @@ public sealed class SettingsService
         if (string.IsNullOrEmpty(this.Settings.PrefixPath))
             this.Settings.PrefixPath = Path.Combine(this.storage.Root.FullName, "proton_prefix");
 
-        if (string.IsNullOrEmpty(this.Settings.GameLocation))
-            this.Settings.GameLocation = Path.Combine(home, "Games", "final-fantasy-xiv");
+        if (string.IsNullOrEmpty(this.Settings.GamePath))
+            this.Settings.GamePath = Path.Combine(home, "Games", "final-fantasy-xiv");
 
-        if (string.IsNullOrEmpty(this.Settings.PatchFolder))
-            this.Settings.PatchFolder = this.storage.GetFolder("patches").FullName;
+        if (string.IsNullOrEmpty(this.Settings.PatchPath))
+            this.Settings.PatchPath = this.storage.GetFolder("patches").FullName;
 
         if (string.IsNullOrEmpty(this.Settings.ConfigPath))
             this.Settings.ConfigPath = this.storage.GetFolder("ffxivConfig").FullName;

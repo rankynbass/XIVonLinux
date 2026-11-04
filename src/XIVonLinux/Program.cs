@@ -20,6 +20,9 @@ internal static class Program
             .WriteTo.File(Path.Combine(storage, "xivonlinux.log"))
             .CreateLogger();
 
+        var versionInfo = XIVonLinux.AppUtil.VersionInfo.Instance();
+        Log.Information("XIVonLinux {Name} v{Version}", versionInfo.Version.FileName, versionInfo.Version.FileVersion);
+
         try
         {
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);

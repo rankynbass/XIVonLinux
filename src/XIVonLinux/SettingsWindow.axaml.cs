@@ -20,11 +20,13 @@ public partial class SettingsWindow : Window
     {
         this.settingsService = service;
         var s = service.Settings;
+        GamePathBox.Text = s.GamePath;
+        ConfigPathBox.Text = s.ConfigPath;
+        PatchPathBox.Text = s.PatchPath;
         ProtonPathBox.Text = s.ProtonPath;
         PrefixPathBox.Text = s.PrefixPath;
-        GameLocationBox.Text = s.GameLocation;
-        ConfigPathBox.Text = s.ConfigPath;
-        PatchFolderBox.Text = s.PatchFolder;
+        DxvkCheck.IsChecked = s.EnableDxvk;
+        ExtraWineDllOverridesBox.Text = s.ExtraWineDllOverrides;
         LanguageCombo.Items.Add("English");
         LanguageCombo.Items.Add("Japanese");
         LanguageCombo.Items.Add("German");
@@ -35,20 +37,20 @@ public partial class SettingsWindow : Window
         DalamudCheck.IsChecked = s.DalamudEnabled;
     }
 
-    private async void OnBrowseProton(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => await PickFolderAsync(ProtonPathBox);
-
-    private async void OnBrowsePrefix(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => await PickFolderAsync(PrefixPathBox);
-
     private async void OnBrowseGame(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => await PickFolderAsync(GameLocationBox);
+        => await PickFolderAsync(GamePathBox);
 
     private async void OnBrowseConfig(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => await PickFolderAsync(ConfigPathBox);
 
     private async void OnBrowsePatch(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => await PickFolderAsync(PatchFolderBox);
+        => await PickFolderAsync(PatchPathBox);
+
+    private async void OnBrowseProton(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => await PickFolderAsync(ProtonPathBox);
+
+    private async void OnBrowsePrefix(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => await PickFolderAsync(PrefixPathBox);
 
     private async Task PickFolderAsync(TextBox box)
     {
@@ -63,12 +65,14 @@ public partial class SettingsWindow : Window
         if (this.settingsService is null)
             return;
         var s = this.settingsService.Settings;
+        s.GamePath = GamePathBox.Text;
+        s.ConfigPath = ConfigPathBox.Text;
+        s.PatchPath = PatchPathBox.Text;
+        s.Language = LanguageCombo.SelectedItem as string ?? "English";
         s.ProtonPath = ProtonPathBox.Text;
         s.PrefixPath = PrefixPathBox.Text;
-        s.GameLocation = GameLocationBox.Text;
-        s.ConfigPath = ConfigPathBox.Text;
-        s.PatchFolder = PatchFolderBox.Text;
-        s.Language = LanguageCombo.SelectedItem as string ?? "English";
+        s.EnableDxvk = DxvkCheck.IsChecked == true;
+        s.ExtraWineDllOverrides = ExtraWineDllOverridesBox.Text;
         s.DalamudEnabled = DalamudCheck.IsChecked == true;
         this.settingsService.Save();
         Close();
