@@ -29,6 +29,7 @@ public sealed class LaunchSettings
     public bool FreeTrial { get; set; }
     public bool DalamudEnabled { get; set; } = true;
     public string Language { get; set; } = "English";   // game client language: Japanese/English/German/French
+    public string? CurrentAccountId { get; set; }   // accounts.toml account the launcher pre-selects
 }
 
 /// <summary>
@@ -78,6 +79,8 @@ public sealed class SettingsService
         sb.AppendLine($"free_trial = {this.Settings.FreeTrial.ToString().ToLowerInvariant()}");
         sb.AppendLine($"dalamud_enabled = {this.Settings.DalamudEnabled.ToString().ToLowerInvariant()}");
         sb.AppendLine($"language = {TomlString(this.Settings.Language)}");
+        if (!string.IsNullOrEmpty(this.Settings.CurrentAccountId))
+            sb.AppendLine($"current_account = {TomlString(this.Settings.CurrentAccountId)}");
 
         var file = this.storage.GetFile("settings.toml");
         File.WriteAllText(file.FullName, sb.ToString());
@@ -125,6 +128,7 @@ public sealed class SettingsService
         s.FreeTrial = GetBool("free_trial", s.FreeTrial);
         s.DalamudEnabled = GetBool("dalamud_enabled", s.DalamudEnabled);
         if (Get("language") is string lg) s.Language = lg;
+        if (Get("current_account") is string ca) s.CurrentAccountId = ca;
         return s;
     }
 

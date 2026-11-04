@@ -30,6 +30,9 @@ public partial class MainWindow : Window
 
     private int activeLaunches;
     private readonly SettingsService settingsService;
+    /// <summary>Saved login accounts (~/.xivonlinux/accounts.toml); passwords are held
+    /// in the manager's in-memory cache only (credentials are never persisted).</summary>
+    private readonly AccountManager accounts;
     /// <summary>Background Dalamud installer/updater (XIVLauncher.Common.Dalamud.DalamudUpdater).
     /// Started at launcher startup: resolves the release version, downloads the injector +
     /// .NET runtime into ~/.xivonlinux (dalamud/, runtime/, dalamudAssets/) as needed.
@@ -41,10 +44,25 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         this.settingsService = new SettingsService();
+        this.accounts = new AccountManager(this.settingsService);
         var s = this.settingsService.Settings;
         UsernameBox.Text = s.Username;
         SteamAccountCheck.IsChecked = s.SteamAccount;
         FreeTrialCheck.IsChecked = s.FreeTrial;
+
+        // Pre-select the saved current account (XIVLauncher.Core startup shape).
+        var saved = this.accounts.CurrentAccount;
+        if (saved is not null) SwitchAccountFields(saved, saveAsCurrent: false);
+
+        // Accounts menu: ContextMenu shown at click time. MenuFlyout in Avalonia 12.1.4
+        // builds its popup before Opening fires, so items added in the Opening handler
+        // never render — the documented dynamic-item pattern is ContextMenu.Opening.
+        AccountsButton.Click += (_, _) =>
+        {
+            var cm = new ContextMenu();
+            BuildAccountsMenu(cm);   // Open() does not raise Opening in Avalonia 12.1.4, so build first
+            cm.Open(AccountsButton);
+        };
 
         this.dalamudUpdater = new DalamudUpdater(NewsHttp,
             this.settingsService.GetFolder("dalamud"),
@@ -80,6 +98,131 @@ public partial class MainWindow : Window
         LogToggleButton.Content = StatusLog.IsVisible ? "Hide log" : "Show log";
     }
 
+    // ---------- accounts ----------
+
+    /// <summary>Rebuilds the Accounts menu on open: saved accounts (name + Steam/OTP/Trial
+    /// tags, XIVLauncher.Core AccountSwitcher shape), then Add/Update, Remove, Remove All.</summary>
+    private int BuildAccountsMenu(ContextMenu cm)
+    {
+        cm.Items.Clear();
+
+        if (this.accounts.Accounts.Count == 0)
+            cm.Items.Add(new MenuItem { Header = "No saved accounts", IsEnabled = false });
+
+        foreach (var account in this.accounts.Accounts)
+        {
+            var name = account.UserName;
+            if (account.UseSteamServiceAccount) name += " (Steam)";
+            if (account.UseOtp) name += " (OTP)";
+            if (account.IsFreeTrial) name += " (Trial)";
+
+            var item = new MenuItem { Header = name };
+            var captured = account;
+            item.Click += (_, _) => SelectAccount(captured);
+            cm.Items.Add(item);
+        }
+
+        cm.Items.Add(new Separator());
+
+        var add = new MenuItem { Header = "Add/Update Account" };
+        add.Click += (_, _) =>
+        {
+            PersistAccount(UsernameBox.Text, PasswordBox.Text, false, SteamAccountCheck.IsChecked == true,
+                FreeTrialCheck.IsChecked == true, null, saveAsCurrent: true);
+            Report($"Account '{UsernameBox.Text}' saved (password kept in memory only)");
+        };
+
+        var remove = new MenuItem { Header = "Remove Current Account" };
+        remove.Click += (_, _) =>
+        {
+            var target = this.accounts.ByUserName(UsernameBox.Text);
+            if (target is not null)
+            {
+                this.accounts.RemoveAccount(target);
+                Report($"Account '{target.UserName}' removed");
+            }
+            else
+                Report("Current account is not saved");
+        };
+
+        var removeAll = new MenuItem { Header = "Remove All Accounts" };
+        removeAll.Click += (_, _) =>
+        {
+            this.accounts.RemoveAllAccounts();
+            Report("All accounts removed");
+        };
+
+        cm.Items.Add(add);
+        cm.Items.Add(remove);
+        cm.Items.Add(removeAll);
+        return cm.Items.Count;
+    }
+
+    /// <summary>Menu pick: fill the login fields from the account (password comes from the
+    /// in-memory cache, populated by past logins in this session; OTP prefills the last
+    /// successful code when the account uses OTP) and mark it current.</summary>
+    private void SelectAccount(XivAccount account)
+    {
+        SwitchAccountFields(account, saveAsCurrent: true);
+        Report($"Switched to account '{account.UserName}'");
+    }
+
+    private void SwitchAccountFields(XivAccount account, bool saveAsCurrent)
+    {
+        UsernameBox.Text = account.UserName;
+        PasswordBox.Text = account.Password;
+        SteamAccountCheck.IsChecked = account.UseSteamServiceAccount;
+        FreeTrialCheck.IsChecked = account.IsFreeTrial;
+        if (account.UseOtp && !string.IsNullOrEmpty(account.LastSuccessfulOtp))
+            OtpBox.Text = account.LastSuccessfulOtp;
+
+        var s = this.settingsService.Settings;
+        s.Username = account.UserName;
+        s.SteamAccount = account.UseSteamServiceAccount;
+        s.FreeTrial = account.IsFreeTrial;
+        this.settingsService.Save();
+
+        if (saveAsCurrent)
+            this.accounts.CurrentAccount = account;
+    }
+
+    /// <summary>XIVLauncher.Core PersistAccount shape: merge the login fields into the
+    /// account store (password stays in memory), set the current account, and remember
+    /// the OTP that just worked.</summary>
+    private void PersistAccount(string username, string password, bool isOtp, bool isSteam, bool isFreeTrial,
+        string? usedOtp = null, bool saveAsCurrent = false)
+    {
+        if (string.IsNullOrEmpty(username))
+            return;
+
+        var current = this.accounts.CurrentAccount;
+        if (current is not null && current.UserName.Equals(username, StringComparison.OrdinalIgnoreCase))
+        {
+            current.Password = password;
+            if (current.IsFreeTrial != isFreeTrial)
+                this.accounts.UpdateFreeTrial(current, isFreeTrial);
+        }
+
+        var id = $"{username.ToLower()}-{isOtp}-{isSteam}";
+        if (current is null || current.Id != id)
+        {
+            var accountToSave = new XivAccount(username)
+            {
+                Password = password,
+                SavePassword = false,
+                UseOtp = isOtp,
+                UseSteamServiceAccount = isSteam,
+                IsFreeTrial = isFreeTrial,
+            };
+            this.accounts.AddAccount(accountToSave);
+            this.accounts.CurrentAccount = accountToSave;
+            current = accountToSave;
+        }
+
+        if (!string.IsNullOrEmpty(usedOtp) && current.UseOtp)
+            this.accounts.UpdateLastSuccessfulOtp(current, usedOtp);
+    }
+
     // ---------- login ----------
 
     private void OnLogin(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -91,6 +234,13 @@ public partial class MainWindow : Window
         s.SteamAccount = SteamAccountCheck.IsChecked == true;
         s.FreeTrial = FreeTrialCheck.IsChecked == true;
         this.settingsService.Save();
+
+        // XIVLauncher.Core persists the account at login time (MainPage.Login calls
+        // PersistAccount before the OAuth request), so pressing Login once registers
+        // the account in accounts.toml and the Accounts menu; the Ok-path refreshes
+        // the password and remembers the OTP that worked.
+        PersistAccount(s.Username, s.Password, !string.IsNullOrEmpty(s.OneTimePassword),
+            s.SteamAccount, s.FreeTrial, null, saveAsCurrent: true);
 
         StartPipeline(s.DalamudEnabled);
     }
@@ -520,6 +670,14 @@ public partial class MainWindow : Window
             Report($"Logging in as {s.Username} (steam: {s.SteamAccount}, free trial: {s.FreeTrial})");
             var result = await service.LoginAsync(new LoginRequest { Username = s.Username, Password = s.Password, OneTimePassword = s.OneTimePassword, SteamAccount = s.SteamAccount, FreeTrial = s.FreeTrial }, gamePath);
             Report($"Login state: {result.State}");
+
+            if (result.State == XivGame.LoginState.Ok)
+            {
+                // XIVLauncher.Core PersistAccount: merge login into the account store after
+                // a successful login; the password lives in memory, the OTP that worked is remembered.
+                PersistAccount(s.Username, s.Password, !string.IsNullOrEmpty(s.OneTimePassword),
+                    s.SteamAccount, s.FreeTrial, s.OneTimePassword, saveAsCurrent: true);
+            }
 
             switch (result.State)
             {
