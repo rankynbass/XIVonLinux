@@ -193,6 +193,19 @@ public sealed class LoginService : IDisposable
     {
         var gamePath = new DirectoryInfo(gameLocation);
         var patchStore = new DirectoryInfo(patchFolder);
+
+        // PatchManager.PatchAsync calls PlatformHelpers.GetDiskFreeSpace on both
+        // directories, and new DriveInfo(path) throws DriveNotFoundException when the
+        // path does not exist (fresh install). Ensure both dirs exist; for the game dir,
+        // walk up to the nearest existing ancestor first so the free-space check resolves
+        // the mount the leaf will live on, then create the leaf.
+        var anchor = gamePath;
+        while (anchor is not null && !Directory.Exists(anchor.FullName))
+            anchor = anchor.Parent;
+        if (anchor is null)
+            throw new DirectoryNotFoundException($"Cannot resolve a real filesystem ancestor for '{gameLocation}'");
+
+        Directory.CreateDirectory(gamePath.FullName);
         Directory.CreateDirectory(patchStore.FullName);
 
         var logFile = storage.GetFile("aria2.log");

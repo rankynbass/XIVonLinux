@@ -73,13 +73,6 @@ public sealed class AccountManager
         Save();
     }
 
-    public void UpdateLastSuccessfulOtp(XivAccount account, string lastOtp)
-    {
-        var existing = this.Accounts.FirstOrDefault(a => a.Id == account.Id);
-        if (existing is not null) existing.LastSuccessfulOtp = lastOtp;
-        Save();
-    }
-
     private FileInfo AccountFile => this.settings.GetFile("accounts.toml");
 
     public void Save()
@@ -96,7 +89,6 @@ public sealed class AccountManager
             sb.AppendLine($"chosen_character_name = {TomlString(a.ChosenCharacterName)}");
             sb.AppendLine($"chosen_character_world = {TomlString(a.ChosenCharacterWorld)}");
             sb.AppendLine($"thumbnail_url = {TomlString(a.ThumbnailUrl)}");
-            sb.AppendLine($"last_successful_otp = {TomlString(a.LastSuccessfulOtp)}");
             sb.AppendLine();
         }
         File.WriteAllText(AccountFile.FullName, sb.ToString());
@@ -149,7 +141,6 @@ public sealed class AccountManager
                 acc.ChosenCharacterName = GetStr(t, "chosen_character_name") ?? "";
                 acc.ChosenCharacterWorld = GetStr(t, "chosen_character_world") ?? "";
                 acc.ThumbnailUrl = GetStr(t, "thumbnail_url") ?? "";
-                acc.LastSuccessfulOtp = GetStr(t, "last_successful_otp") ?? "";
                 this.Accounts.Add(acc);
             }
         }

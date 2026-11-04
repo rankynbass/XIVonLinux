@@ -24,8 +24,6 @@ public sealed class XivAccount
     public string ChosenCharacterWorld { get; set; } = string.Empty;
     public string ThumbnailUrl { get; set; } = string.Empty;
 
-    public string LastSuccessfulOtp { get; set; } = string.Empty;
-
     public XivAccount(string userName)
     {
         UserName = userName.ToLower();

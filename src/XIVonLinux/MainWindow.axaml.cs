@@ -90,12 +90,19 @@ public partial class MainWindow : Window
 
     // ---------- log box visibility ----------
 
+    /// <summary>Show/hide the log box (it replaces the news panel; the login side is
+    /// never hidden). ShowLog(true) is called on Login press so pipeline errors are
+    /// visible in the log box as they happen.</summary>
+    private void ShowLog(bool show)
+    {
+        StatusLog.IsVisible = show;
+        NewsPanel.IsVisible = !show;
+        LogToggleButton.Content = show ? "Hide log" : "Show log";
+    }
+
     private void OnToggleLog(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        // The log replaces the news panel (login side stays put); window size is fixed.
-        StatusLog.IsVisible = !StatusLog.IsVisible;
-        NewsPanel.IsVisible = !StatusLog.IsVisible;
-        LogToggleButton.Content = StatusLog.IsVisible ? "Hide log" : "Show log";
+        ShowLog(!StatusLog.IsVisible);
     }
 
     // ---------- accounts ----------
@@ -128,7 +135,7 @@ public partial class MainWindow : Window
         add.Click += (_, _) =>
         {
             PersistAccount(UsernameBox.Text, PasswordBox.Text, false, SteamAccountCheck.IsChecked == true,
-                FreeTrialCheck.IsChecked == true, null, saveAsCurrent: true);
+                FreeTrialCheck.IsChecked == true, saveAsCurrent: true);
             Report($"Account '{UsernameBox.Text}' saved (password kept in memory only)");
         };
 
@@ -173,8 +180,6 @@ public partial class MainWindow : Window
         PasswordBox.Text = account.Password;
         SteamAccountCheck.IsChecked = account.UseSteamServiceAccount;
         FreeTrialCheck.IsChecked = account.IsFreeTrial;
-        if (account.UseOtp && !string.IsNullOrEmpty(account.LastSuccessfulOtp))
-            OtpBox.Text = account.LastSuccessfulOtp;
 
         var s = this.settingsService.Settings;
         s.Username = account.UserName;
@@ -187,10 +192,10 @@ public partial class MainWindow : Window
     }
 
     /// <summary>XIVLauncher.Core PersistAccount shape: merge the login fields into the
-    /// account store (password stays in memory), set the current account, and remember
-    /// the OTP that just worked.</summary>
+    /// account store (password stays in memory) and set the current account. The OTP is
+    /// NOT remembered — it changes every minute, so saving it is useless.</summary>
     private void PersistAccount(string username, string password, bool isOtp, bool isSteam, bool isFreeTrial,
-        string? usedOtp = null, bool saveAsCurrent = false)
+        bool saveAsCurrent = false)
     {
         if (string.IsNullOrEmpty(username))
             return;
@@ -219,8 +224,8 @@ public partial class MainWindow : Window
             current = accountToSave;
         }
 
-        if (!string.IsNullOrEmpty(usedOtp) && current.UseOtp)
-            this.accounts.UpdateLastSuccessfulOtp(current, usedOtp);
+        if (saveAsCurrent)
+            this.accounts.CurrentAccount = current;
     }
 
     // ---------- login ----------
@@ -238,9 +243,13 @@ public partial class MainWindow : Window
         // XIVLauncher.Core persists the account at login time (MainPage.Login calls
         // PersistAccount before the OAuth request), so pressing Login once registers
         // the account in accounts.toml and the Accounts menu; the Ok-path refreshes
-        // the password and remembers the OTP that worked.
+        // the password. The OTP is never persisted (it changes every minute).
         PersistAccount(s.Username, s.Password, !string.IsNullOrEmpty(s.OneTimePassword),
-            s.SteamAccount, s.FreeTrial, null, saveAsCurrent: true);
+            s.SteamAccount, s.FreeTrial, saveAsCurrent: true);
+
+        // The login pipeline writes every step and every error into the log box;
+        // show it now so failures are visible as they happen.
+        ShowLog(true);
 
         StartPipeline(s.DalamudEnabled);
     }
@@ -674,9 +683,9 @@ public partial class MainWindow : Window
             if (result.State == XivGame.LoginState.Ok)
             {
                 // XIVLauncher.Core PersistAccount: merge login into the account store after
-                // a successful login; the password lives in memory, the OTP that worked is remembered.
+                // a successful login; the password lives in memory. The OTP is not persisted.
                 PersistAccount(s.Username, s.Password, !string.IsNullOrEmpty(s.OneTimePassword),
-                    s.SteamAccount, s.FreeTrial, s.OneTimePassword, saveAsCurrent: true);
+                    s.SteamAccount, s.FreeTrial, saveAsCurrent: true);
             }
 
             switch (result.State)
