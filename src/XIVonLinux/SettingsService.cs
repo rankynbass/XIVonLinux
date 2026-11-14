@@ -32,12 +32,13 @@ public sealed class LaunchSettings
     // Dalamud tab
     public bool DalamudEnabled { get; set; } = true;
 
-    // Login (not a tab; persisted alongside the tabs)
-    public string Username { get; set; } = "";
+    // Login (not a tab; in-memory session state prefilled from accounts.db — settings.toml
+    // persists only current_account, per Alex: identity comes from the database)
+    public string Username { get; set; } = "";        // UI-only, from the current account
     public string Password { get; set; } = "";        // UI-only, never persisted
     public string OneTimePassword { get; set; } = ""; // UI-only, never persisted
-    public bool SteamAccount { get; set; } = true;
-    public bool FreeTrial { get; set; }
+    public bool SteamAccount { get; set; } = true;    // UI-only, from the current account
+    public bool FreeTrial { get; set; }               // UI-only, from the current account
     public string? CurrentAccountId { get; set; }     // accounts.db user_name the launcher pre-selects
 }
 
@@ -101,9 +102,7 @@ public sealed class SettingsService
         sb.AppendLine();
 
         sb.AppendLine("[login]");
-        sb.AppendLine($"username = {TomlString(this.Settings.Username)}");
-        sb.AppendLine($"steam_account = {this.Settings.SteamAccount.ToString().ToLowerInvariant()}");
-        sb.AppendLine($"free_trial = {this.Settings.FreeTrial.ToString().ToLowerInvariant()}");
+        // Login identity comes from accounts.db: [login] persists only the current account.
         if (!string.IsNullOrEmpty(this.Settings.CurrentAccountId))
             sb.AppendLine($"current_account = {TomlString(this.Settings.CurrentAccountId)}");
 
@@ -178,9 +177,6 @@ public sealed class SettingsService
 
         s.DalamudEnabled = GetBool(dalamud, "enabled", "dalamud_enabled", s.DalamudEnabled);
 
-        if (Get(login, "username", "username") is string un) s.Username = un;
-        s.SteamAccount = GetBool(login, "steam_account", "steam_account", s.SteamAccount);
-        s.FreeTrial = GetBool(login, "free_trial", "free_trial", s.FreeTrial);
         if (Get(login, "current_account", "current_account") is string ca) s.CurrentAccountId = ca;
 
         return s;

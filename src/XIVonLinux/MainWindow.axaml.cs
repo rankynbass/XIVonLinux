@@ -64,6 +64,8 @@ public partial class MainWindow : Window
 
         this.settingsService = new SettingsService();
         this.accounts = new AccountManager(this.settingsService);
+        // Login fields are not persisted in settings.toml: identity is prefilled from the
+        // current account in accounts.db below; defaults are username "", Steam on, trial off.
         var s = this.settingsService.Settings;
         UsernameBox.Text = s.Username;
         SteamAccountCheck.IsChecked = s.SteamAccount;
