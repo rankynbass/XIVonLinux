@@ -26,6 +26,7 @@ public sealed class LaunchSettings
     // Proton tab
     public string ProtonPath { get; set; } = "";
     public string PrefixPath { get; set; } = "";      // WINEPREFIX root; prefix dir = {PrefixPath}/pfx
+    public bool ManagedProton { get; set; }           // false = custom folder pick, true = pick from enumerated Proton list
     public bool EnableDxvk { get; set; } = true;       // DXVK preset for WINEDLLOVERRIDES
     public string ExtraWineDllOverrides { get; set; } = ""; // appended after the DXVK preset
 
@@ -93,6 +94,7 @@ public sealed class SettingsService
         sb.AppendLine("[proton]");
         sb.AppendLine($"proton_path = {TomlString(this.Settings.ProtonPath)}");
         sb.AppendLine($"prefix_path = {TomlString(this.Settings.PrefixPath)}");
+        sb.AppendLine($"managed_proton = {this.Settings.ManagedProton.ToString().ToLowerInvariant()}");
         sb.AppendLine($"enable_dxvk = {this.Settings.EnableDxvk.ToString().ToLowerInvariant()}");
         sb.AppendLine($"extra_wine_dll_overrides = {TomlString(this.Settings.ExtraWineDllOverrides)}");
         sb.AppendLine();
@@ -172,6 +174,7 @@ public sealed class SettingsService
 
         if (Get(proton, "proton_path", "proton_path") is string pt) s.ProtonPath = pt;
         if (Get(proton, "prefix_path", "prefix_path") is string px) s.PrefixPath = px;
+        s.ManagedProton = GetBool(proton, "managed_proton", "managed_proton", s.ManagedProton);
         s.EnableDxvk = GetBool(proton, "enable_dxvk", "enable_dxvk", s.EnableDxvk);
         if (Get(proton, "extra_wine_dll_overrides", "extra_wine_dll_overrides") is string xw) s.ExtraWineDllOverrides = xw;
 

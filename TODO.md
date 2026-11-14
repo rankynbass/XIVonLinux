@@ -25,14 +25,14 @@ Changes and additions to Settings window
 * Allow user to set maximum number of connections. Priority: Low
 
 ### Proton
-* Have a toggle for Custom proton or Managed proton 
+* Have a toggle for Custom proton or Managed proton. Priority: High
 * If Steam-managed proton is selected, enumerate a dropdown list from ~/.local/share/Steam/compatibilitytools.d, ~/.local/share/Steam/steamapps/common, and ~/.xivonlinux/tools/proton. Priority: High
 * Manage umu-launcher versions as well as proton. We should always keep two, the latest version and the previous version, in case there's a bad update pushed. We should download them into ~/.xivonlinux/tools/umu. Priority: High
 * Add a toggle for DXVK-Nvapi. Priority: Low
 
 ### Troubleshooting
 * Add a troubleshooting tab with hacks from XIVLauncher.Core. Priority: Low
-* Generate tspacks from here.
+* Generate tspacks from here. Priority: Low
 
 ## Main Page fixes
 Changes to the main page
@@ -51,5 +51,8 @@ Changes to the main page
 * Make the main settings files (.toml files, any db files, etc) in ~/.config/xivonlinux. Priority: Low
 * Patches and temporary downloads should be in ~/.cache/xivonlinux. Priority: Low
 * Main storage should be ~/.local/share/xivonlinux. Priority: Medium
+
+### Storage structure
+* All logs should go in the STORAGE/logs folder. This includes dalamud logs, launcher logs, wine/proton logs, etc. Priority: Medium, before tspacks.
 
 

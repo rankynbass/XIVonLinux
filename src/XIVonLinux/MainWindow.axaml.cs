@@ -42,6 +42,11 @@ public partial class MainWindow : Window
     /// .NET runtime into ~/.xivonlinux (dalamud/, runtime/, dalamudAssets/) as needed.
     /// The login pipeline waits for State == Done before launching with the injector.</summary>
     private readonly DalamudUpdater dalamudUpdater;
+    /// <summary>Managed umu-launcher zipapp versions (~/.xivonlinux/tools/umu; latest +
+    /// previous kept in case a bad update is pushed). The pipeline uses the newest
+    /// extracted umu-run, falling back to the system /usr/sbin/umu-run.</summary>
+    private readonly UmuManager umuManager;
+    private string umuRunPath = "/usr/sbin/umu-run";
 
     public MainWindow()
     {
@@ -64,6 +69,8 @@ public partial class MainWindow : Window
 
         this.settingsService = new SettingsService();
         this.accounts = new AccountManager(this.settingsService);
+        this.umuManager = new UmuManager(this.settingsService);
+        _ = Task.Run(this.umuManager.EnsureLatestTwoAsync);   // background umu version sync
         // Login fields are not persisted in settings.toml: identity is prefilled from the
         // current account in accounts.db below; defaults are username "", Steam on, trial off.
         var s = this.settingsService.Settings;
@@ -790,8 +797,32 @@ public partial class MainWindow : Window
             Report($"Prefix root: {prefixRoot}");
             Report($"WINEDLLOVERRIDES: {winedllOverrides}");
 
+            // Managed umu-launcher: keep latest + previous zipapp in tools/umu, use the
+            // newest; system umu-run remains the fallback when nothing is installed.
+            await this.umuManager.EnsureLatestTwoAsync();
+            this.umuRunPath = this.umuManager.UmuRunPath();
+            Report($"Using umu-run: {this.umuRunPath}");
+
+            // Prefixes are umu-version-sensitive (steamruntime major changes break them:
+            // a 1.1.0-era prefix hangs under 1.4.4). Track the umu identity in a marker
+            // under the prefix root; on any change, clear the prefix so the bootstrap
+            // below rebuilds it clean.
+            var umuKey = this.umuRunPath.StartsWith(this.settingsService.Root.FullName)
+                ? Path.GetFileName(Path.GetDirectoryName(this.umuRunPath))
+                : "system";
+            var umuMarker = Path.Combine(prefixRoot, "umu-version");
+            if (!File.Exists(umuMarker) || File.ReadAllText(umuMarker).Trim() != umuKey)
+            {
+                var prev = File.Exists(umuMarker) ? File.ReadAllText(umuMarker).Trim() : "none";
+                Report($"umu identity changed ({prev} → {umuKey}) — clearing prefix, first launch rebuilds it (a few minutes)");
+                if (Directory.Exists(prefixRoot))
+                    Directory.Delete(prefixRoot, true);
+                Directory.CreateDirectory(prefixRoot);
+            }
+
             Report("Ensuring prefix (create + bootstrap) — first run can take a few minutes");
-            new UmuCommandRunner(prefix).EnsurePrefix();
+            new UmuCommandRunner(prefix, this.umuRunPath).EnsurePrefix();
+            File.WriteAllText(umuMarker, umuKey);
             Report("Prefix ready");
 
             var lang = Enum.TryParse<ClientLanguage>(s.Language, out var l) ? l : ClientLanguage.English;
@@ -943,7 +974,7 @@ public partial class MainWindow : Window
     /// in Wine-style prefix path, no injector.</summary>
     private void LaunchPlain(UmuPrefix prefix, LoginService service, DirectoryInfo gamePath, XivGame.LoginResult result, ClientLanguage lang, bool isSteam)
     {
-        var gameRunner = new LinuxGameRunner(prefix);
+        var gameRunner = new LinuxGameRunner(prefix, this.umuRunPath);
         var game = new XivGame(new LinuxSteamStub(), new NullUniqueIdCache(), this.frontierUrl, "en");
 
         var userPathWine = prefix.UnixToWinePath(service.GameConfigFolder().FullName);
@@ -1049,7 +1080,7 @@ public partial class MainWindow : Window
 
         Interlocked.Increment(ref activeLaunches);
         Report("In-prefix injector: SE login session + DllInject");
-        var runner = new LinuxDalamudRunner(prefix);
+        var runner = new LinuxDalamudRunner(prefix, this.umuRunPath);
         var proc = runner.Run(injectorExe, false, false, false, gameExe, gameArgs, "", env,
             DalamudLoadMethod.DllInject, startInfo);
 

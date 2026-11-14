@@ -44,10 +44,10 @@ public sealed class LinuxDalamudRunner : IDalamudRunner
     private string capturedUmuError = "";
     private string gameExeName = "";
 
-    public LinuxDalamudRunner(UmuPrefix prefix)
+    public LinuxDalamudRunner(UmuPrefix prefix, string umuRunPath = "/usr/sbin/umu-run")
     {
         this.prefix = prefix;
-        runner = new UmuCommandRunner(prefix);
+        runner = new UmuCommandRunner(prefix, umuRunPath);
     }
 
     /// <summary>Raw stdout captured from the injector's umu-run invocation (the injector

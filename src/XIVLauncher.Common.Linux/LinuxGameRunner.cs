@@ -18,10 +18,10 @@ public sealed class LinuxGameRunner : IGameRunner
     private readonly UmuPrefix prefix;
     private readonly UmuCommandRunner runner;
 
-    public LinuxGameRunner(UmuPrefix prefix)
+    public LinuxGameRunner(UmuPrefix prefix, string umuRunPath = "/usr/sbin/umu-run")
     {
         this.prefix = prefix;
-        runner = new UmuCommandRunner(prefix);
+        runner = new UmuCommandRunner(prefix, umuRunPath);
     }
 
     public Process? Start(string path, string workingDirectory, string arguments, IDictionary<string, string> environment,

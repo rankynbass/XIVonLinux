@@ -14,21 +14,26 @@ namespace XIVLauncher.Common.Linux;
 /// </summary>
 public sealed class UmuCommandRunner
 {
-    private const string UmuRunPath = "/usr/sbin/umu-run";
+    private const string DefaultUmuRunPath = "/usr/sbin/umu-run";
     private const string WinetricksVerb = "winetricks";
 
     private readonly UmuPrefix prefix;
+    /// <summary>Executable to invoke: the system umu-run by default, or a managed
+    /// zipapp umu-run extracted under the app's tools dir. The app passes the path
+    /// as a plain value (layering rule: the library never resolves app storage).</summary>
+    private readonly string umuRunPath;
 
-    public UmuCommandRunner(UmuPrefix prefix)
+    public UmuCommandRunner(UmuPrefix prefix, string umuRunPath = DefaultUmuRunPath)
     {
         this.prefix = prefix;
+        this.umuRunPath = string.IsNullOrEmpty(umuRunPath) ? DefaultUmuRunPath : umuRunPath;
     }
 
     /// <summary>Run a command inside the prefix (args are in-prefix, i.e. Windows paths).</summary>
     public Process RunInPrefix(string command, string workingDirectory = "", IDictionary<string, string>? environment = null,
         bool redirectOutput = false, bool writeLog = false)
     {
-        var psi = new ProcessStartInfo(UmuRunPath);
+        var psi = new ProcessStartInfo(umuRunPath);
         psi.Arguments = command;
         return Run(psi, workingDirectory, environment, redirectOutput, writeLog);
     }
@@ -36,7 +41,7 @@ public sealed class UmuCommandRunner
     public Process RunInPrefix(IEnumerable<string> args, string workingDirectory = "", IDictionary<string, string>? environment = null,
         bool redirectOutput = false, bool writeLog = false)
     {
-        var psi = new ProcessStartInfo(UmuRunPath);
+        var psi = new ProcessStartInfo(umuRunPath);
         foreach (var a in args)
             psi.ArgumentList.Add(a);
         return Run(psi, workingDirectory, environment, redirectOutput, writeLog);
@@ -50,7 +55,7 @@ public sealed class UmuCommandRunner
     /// </summary>
     public Process CreatePrefix()
     {
-        var psi = new ProcessStartInfo(UmuRunPath) { Arguments = "\"\"" };
+        var psi = new ProcessStartInfo(umuRunPath) { Arguments = "\"\"" };
         return Run(psi, prefix.SteamCompatDataPath, null, false, true);
     }
 
@@ -82,7 +87,7 @@ public sealed class UmuCommandRunner
     /// <summary>Run winetricks verbs inside the prefix (GE/UMU-Proton support).</summary>
     public Process Winetricks(params string[] verbs)
     {
-        var psi = new ProcessStartInfo(UmuRunPath);
+        var psi = new ProcessStartInfo(umuRunPath);
         psi.ArgumentList.Add(WinetricksVerb);
         foreach (var v in verbs)
             psi.ArgumentList.Add(v);
