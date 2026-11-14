@@ -36,7 +36,34 @@ public sealed class UmuManager
         this.http.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
     }
 
-    private string ToolsRoot => Path.Combine(settings.Root.FullName, "tools", "umu");
+    /// <summary>~/.xivonlinux/tools/umu — the managed zipapp install root.</summary>
+    public string ToolsRoot => Path.Combine(settings.Root.FullName, "tools", "umu");
+
+    /// <summary>Installed managed zipapp tags, newest first (Version-parse order).</summary>
+    public List<string> InstalledTags()
+    {
+        if (!Directory.Exists(ToolsRoot))
+            return new List<string>();
+        var tags = Directory.GetDirectories(ToolsRoot)
+            .Select(Path.GetFileName)
+            .Where(t => t is not null && File.Exists(Path.Combine(ToolsRoot, t!, "umu-run")))
+            .Select(t => t!)
+            .ToList();
+        tags.Sort((a, b) =>
+        {
+            var va = Version.TryParse(a, out var x) ? x : new Version(0, 0);
+            var vb = Version.TryParse(b, out var y) ? y : new Version(0, 0);
+            return vb.CompareTo(va);
+        });
+        return tags;
+    }
+
+    /// <summary>The umu-run path for a managed tag; null when not installed.</summary>
+    public string? PathForTag(string tag)
+    {
+        var p = Path.Combine(ToolsRoot, tag, "umu-run");
+        return File.Exists(p) ? p : null;
+    }
 
     /// <summary>The executable to invoke for prefix/game/injector runs: the newest managed
     /// zipapp umu-run when installed, otherwise the system umu-run. Plain path value handed

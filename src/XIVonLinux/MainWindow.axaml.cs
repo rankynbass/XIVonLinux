@@ -48,6 +48,27 @@ public partial class MainWindow : Window
     private readonly UmuManager umuManager;
     private string umuRunPath = "/usr/sbin/umu-run";
 
+    /// <summary>umu-run to invoke, resolved from settings: the managed latest/previous
+    /// tag picked in the Proton tab, the custom picked folder's umu-run, falling back
+    /// to the newest managed install, then the system binary.</summary>
+    private string ResolveUmuRunPath()
+    {
+        var s = this.settingsService.Settings;
+        if (s.ManagedUmu)
+        {
+            var p = this.umuManager.PathForTag(s.UmuTag);
+            if (p is not null)
+                return p;
+        }
+        else if (!string.IsNullOrEmpty(s.UmuPath))
+        {
+            var p = Path.Combine(s.UmuPath, "umu-run");
+            if (File.Exists(p))
+                return p;
+        }
+        return this.umuManager.UmuRunPath();
+    }
+
     public MainWindow()
     {
         InitializeComponent();
@@ -800,16 +821,20 @@ public partial class MainWindow : Window
             // Managed umu-launcher: keep latest + previous zipapp in tools/umu, use the
             // newest; system umu-run remains the fallback when nothing is installed.
             await this.umuManager.EnsureLatestTwoAsync();
-            this.umuRunPath = this.umuManager.UmuRunPath();
+            this.umuRunPath = ResolveUmuRunPath();
             Report($"Using umu-run: {this.umuRunPath}");
 
             // Prefixes are umu-version-sensitive (steamruntime major changes break them:
             // a 1.1.0-era prefix hangs under 1.4.4). Track the umu identity in a marker
             // under the prefix root; on any change, clear the prefix so the bootstrap
-            // below rebuilds it clean.
-            var umuKey = this.umuRunPath.StartsWith(this.settingsService.Root.FullName)
+            // below rebuilds it clean. Custom picks key on their folder name, the
+            // system binary on "system".
+            var rootFull = this.settingsService.Root.FullName;
+            var umuKey = this.umuRunPath.StartsWith(rootFull)
                 ? Path.GetFileName(Path.GetDirectoryName(this.umuRunPath))
-                : "system";
+                : this.umuRunPath == "/usr/sbin/umu-run"
+                    ? "system"
+                    : "custom:" + Path.GetFileName(Path.GetDirectoryName(this.umuRunPath));
             var umuMarker = Path.Combine(prefixRoot, "umu-version");
             if (!File.Exists(umuMarker) || File.ReadAllText(umuMarker).Trim() != umuKey)
             {

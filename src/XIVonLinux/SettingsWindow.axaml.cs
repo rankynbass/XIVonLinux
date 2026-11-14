@@ -45,7 +45,72 @@ public partial class SettingsWindow : Window
             ProtonCombo.SelectedItem = s.ProtonPath;
         ManagedProtonCheck.IsChecked = s.ManagedProton;
         ApplyProtonMode(s.ManagedProton);
+
+        // Umu enumeration (Alex): managed mode picks the latest/previous managed zipapp
+        // installs under ~/.xivonlinux/tools/umu; custom mode is a folder picker for a
+        // disk-side folder containing umu-run.
+        var umuTags = EnumerateUmuTags();
+        for (var i = 0; i < umuTags.Count; i++)
+            UmuCombo.Items.Add(i == 0 ? $"{umuTags[i]} (latest)" : $"{umuTags[i]} (previous)");
+        var savedTag = s.UmuTag;
+        for (var i = 0; i < umuTags.Count; i++)
+            if (umuTags[i] == savedTag)
+                UmuCombo.SelectedIndex = i;
+        if (UmuCombo.SelectedIndex < 0 && UmuCombo.Items.Count > 0)
+            UmuCombo.SelectedIndex = 0;
+        UmuPathBox.Text = s.UmuPath;
+        ManagedUmuCheck.IsChecked = s.ManagedUmu;
+        ApplyUmuMode(s.ManagedUmu);
     }
+
+    /// <summary>Managed zipapp tags installed under ~/.xivonlinux/tools/umu (dirs that
+    /// contain umu-run), newest first.</summary>
+    private static List<string> EnumerateUmuTags()
+    {
+        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".xivonlinux", "tools", "umu");
+        if (!Directory.Exists(root))
+            return new List<string>();
+        var tags = Directory.GetDirectories(root)
+            .Select(Path.GetFileName)
+            .Where(t => t is not null && File.Exists(Path.Combine(root, t!, "umu-run")))
+            .Select(t => t!)
+            .ToList();
+        tags.Sort((a, b) =>
+        {
+            var va = Version.TryParse(a, out var x) ? x : new Version(0, 0);
+            var vb = Version.TryParse(b, out var y) ? y : new Version(0, 0);
+            return vb.CompareTo(va);
+        });
+        return tags;
+    }
+
+    /// <summary>Custom mode: Umu textbox + Browse. Managed mode: latest/previous combo.</summary>
+    private void ApplyUmuMode(bool managed)
+    {
+        UmuPathBox.IsVisible = !managed;
+        UmuBrowseButton.IsVisible = !managed;
+        UmuCombo.IsVisible = managed;
+        UmuLabel.Text = managed ? "Umu (Managed)" : "Umu (Custom)";
+        if (managed && UmuCombo.SelectedIndex < 0 && UmuCombo.Items.Count > 0)
+            UmuCombo.SelectedIndex = 0;
+    }
+
+    private void OnManagedUmuToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => ApplyUmuMode(ManagedUmuCheck.IsChecked == true);
+
+    private void OnUmuCombo(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        // Keep the custom textbox in sync with the selection (tag without the display suffix).
+        if (UmuCombo.SelectedItem is string sel)
+        {
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            UmuPathBox.Text = Path.Combine(home, ".xivonlinux", "tools", "umu", sel.Split(" (")[0]);
+        }
+    }
+
+    private async void OnBrowseUmu(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => await PickFolderAsync(UmuPathBox);
 
     /// <summary>Proton tool directories: any folder containing a top-level `proton` script
     /// (the Steam compatibility-tool layout) in compatibilitytools.d, steamapps/common,
@@ -130,6 +195,10 @@ public partial class SettingsWindow : Window
             s.ProtonPath = pick;   // managed mode: the enumerated selection wins
         else
             s.ProtonPath = ProtonPathBox.Text;
+        s.ManagedUmu = ManagedUmuCheck.IsChecked == true;
+        if (s.ManagedUmu && UmuCombo.SelectedItem is string umuSel)
+            s.UmuTag = umuSel.Split(" (")[0];   // managed mode: strip the display suffix
+        s.UmuPath = UmuPathBox.Text;            // custom mode: picked folder containing umu-run
         s.PrefixPath = PrefixPathBox.Text;
         s.EnableDxvk = DxvkCheck.IsChecked == true;
         s.ExtraWineDllOverrides = ExtraWineDllOverridesBox.Text;

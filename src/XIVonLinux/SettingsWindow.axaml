@@ -36,7 +36,7 @@
             </TabItem>
 
             <TabItem Header="Proton">
-                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="0,12,0,0">
+                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,12,0,0">
                     <!-- Custom = folder pick (Proton row + Browse); managed = pick from the
                          enumerated Proton list (compatibilitytools.d, steamapps/common, tools/proton).
                          Combo occupies the same row as the Proton textbox — swapping in place,
@@ -51,15 +51,25 @@
                     <ComboBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Name="ProtonCombo"
                               Margin="0,0,0,6" IsVisible="False" SelectionChanged="OnProtonCombo" />
 
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Prefix" VerticalAlignment="Center" Margin="0,0,12,6" />
-                    <TextBox Grid.Row="2" Grid.Column="1" Name="PrefixPathBox" Margin="0,0,8,6" />
-                    <Button Grid.Row="2" Grid.Column="2" Content="Browse" Name="PrefixBrowseButton" Click="OnBrowsePrefix" Margin="0,0,0,6" />
+                    <CheckBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Content="Managed umu launcher (latest/previous GitHub releases)"
+                              Name="ManagedUmuCheck" HorizontalAlignment="Left" Margin="0,0,0,6"
+                              IsChecked="True" IsCheckedChanged="OnManagedUmuToggled" />
 
-                    <CheckBox Grid.Row="3" Grid.Column="1" Content="Enable DXVK" Name="DxvkCheck"
+                    <TextBlock Grid.Row="3" Grid.Column="0" Name="UmuLabel" Text="Umu (Custom)" VerticalAlignment="Center" Margin="0,0,12,6" />
+                    <TextBox Grid.Row="3" Grid.Column="1" Name="UmuPathBox" Margin="0,0,8,6" />
+                    <Button Grid.Row="3" Grid.Column="2" Content="Browse" Name="UmuBrowseButton" Click="OnBrowseUmu" Margin="0,0,0,6" />
+                    <ComboBox Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Name="UmuCombo"
+                              Margin="0,0,0,6" IsVisible="False" SelectionChanged="OnUmuCombo" />
+
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Prefix" VerticalAlignment="Center" Margin="0,0,12,6" />
+                    <TextBox Grid.Row="4" Grid.Column="1" Name="PrefixPathBox" Margin="0,0,8,6" />
+                    <Button Grid.Row="4" Grid.Column="2" Content="Browse" Name="PrefixBrowseButton" Click="OnBrowsePrefix" Margin="0,0,0,6" />
+
+                    <CheckBox Grid.Row="5" Grid.Column="1" Content="Enable DXVK" Name="DxvkCheck"
                               HorizontalAlignment="Left" Margin="0,0,0,6" />
 
-                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Extra Wine DLL Overrides" VerticalAlignment="Center" Margin="0,0,12,6" />
-                    <TextBox Grid.Row="4" Grid.Column="1" Name="ExtraWineDllOverridesBox" Margin="0,0,8,6" />
+                    <TextBlock Grid.Row="6" Grid.Column="0" Text="Extra Wine DLL Overrides" VerticalAlignment="Center" Margin="0,0,12,6" />
+                    <TextBox Grid.Row="6" Grid.Column="1" Name="ExtraWineDllOverridesBox" Margin="0,0,8,6" />
                 </Grid>
             </TabItem>
 

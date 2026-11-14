@@ -27,6 +27,9 @@ public sealed class LaunchSettings
     public string ProtonPath { get; set; } = "";
     public string PrefixPath { get; set; } = "";      // WINEPREFIX root; prefix dir = {PrefixPath}/pfx
     public bool ManagedProton { get; set; }           // false = custom folder pick, true = pick from enumerated Proton list
+    public bool ManagedUmu { get; set; } = true;      // false = custom umu-run folder pick, true = pick latest/previous managed zipapp
+    public string UmuTag { get; set; } = "";          // managed mode: selected tools/umu/<tag>
+    public string UmuPath { get; set; } = "";         // custom mode: folder on disk containing umu-run
     public bool EnableDxvk { get; set; } = true;       // DXVK preset for WINEDLLOVERRIDES
     public string ExtraWineDllOverrides { get; set; } = ""; // appended after the DXVK preset
 
@@ -95,6 +98,9 @@ public sealed class SettingsService
         sb.AppendLine($"proton_path = {TomlString(this.Settings.ProtonPath)}");
         sb.AppendLine($"prefix_path = {TomlString(this.Settings.PrefixPath)}");
         sb.AppendLine($"managed_proton = {this.Settings.ManagedProton.ToString().ToLowerInvariant()}");
+        sb.AppendLine($"managed_umu = {this.Settings.ManagedUmu.ToString().ToLowerInvariant()}");
+        sb.AppendLine($"umu_tag = {TomlString(this.Settings.UmuTag)}");
+        sb.AppendLine($"umu_path = {TomlString(this.Settings.UmuPath)}");
         sb.AppendLine($"enable_dxvk = {this.Settings.EnableDxvk.ToString().ToLowerInvariant()}");
         sb.AppendLine($"extra_wine_dll_overrides = {TomlString(this.Settings.ExtraWineDllOverrides)}");
         sb.AppendLine();
@@ -175,6 +181,9 @@ public sealed class SettingsService
         if (Get(proton, "proton_path", "proton_path") is string pt) s.ProtonPath = pt;
         if (Get(proton, "prefix_path", "prefix_path") is string px) s.PrefixPath = px;
         s.ManagedProton = GetBool(proton, "managed_proton", "managed_proton", s.ManagedProton);
+        s.ManagedUmu = GetBool(proton, "managed_umu", "managed_umu", s.ManagedUmu);
+        if (Get(proton, "umu_tag", "umu_tag") is string ut) s.UmuTag = ut;
+        if (Get(proton, "umu_path", "umu_path") is string up) s.UmuPath = up;
         s.EnableDxvk = GetBool(proton, "enable_dxvk", "enable_dxvk", s.EnableDxvk);
         if (Get(proton, "extra_wine_dll_overrides", "extra_wine_dll_overrides") is string xw) s.ExtraWineDllOverrides = xw;
 
