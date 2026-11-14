@@ -12,7 +12,7 @@ TODO list for developing XIVonLinux launcher
 Changes and additions to Settings window
 
 ### Dalamud
-* Match features of XIVLauncher.Core. Priority: Medium
+* [DONE 2026-11-14 16:15 PT] Match features of XIVLauncher.Core. Priority: Medium
 * [DONE 2026-11-14 14:00 PT] Make sure that dalamud is obeying the killswitch (disabled for patch days, etc). Priority: Very High
 
 ### Game
