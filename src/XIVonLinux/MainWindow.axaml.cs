@@ -153,8 +153,8 @@ public partial class MainWindow : Window
         var add = new MenuItem { Header = "Add/Update Account" };
         add.Click += (_, _) =>
         {
-            PersistAccount(UsernameBox.Text, PasswordBox.Text, false, SteamAccountCheck.IsChecked == true,
-                FreeTrialCheck.IsChecked == true, saveAsCurrent: true);
+            PersistAccount(UsernameBox.Text, PasswordBox.Text, OtpCheck.IsChecked == true,
+                SteamAccountCheck.IsChecked == true, FreeTrialCheck.IsChecked == true, saveAsCurrent: true);
             Report($"Account '{UsernameBox.Text}' saved (password kept in memory only)");
         };
 
@@ -199,6 +199,7 @@ public partial class MainWindow : Window
         PasswordBox.Text = account.Password;
         SteamAccountCheck.IsChecked = account.UseSteamServiceAccount;
         FreeTrialCheck.IsChecked = account.IsFreeTrial;
+        OtpCheck.IsChecked = account.UseOtp;
 
         var s = this.settingsService.Settings;
         s.Username = account.UserName;
@@ -249,22 +250,37 @@ public partial class MainWindow : Window
 
     // ---------- login ----------
 
-    private void OnLogin(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnLogin(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         var s = this.settingsService.Settings;
         s.Username = UsernameBox.Text;
         s.Password = PasswordBox.Text;
-        s.OneTimePassword = OtpBox.Text;
         s.SteamAccount = SteamAccountCheck.IsChecked == true;
         s.FreeTrial = FreeTrialCheck.IsChecked == true;
+
+        // OTP is a true/false setting; when enabled, a popup prompts for the 6-digit code
+        // and the login proceeds only when its Login button is pressed (Cancel aborts).
+        var isOtp = OtpCheck.IsChecked == true;
+        if (isOtp)
+        {
+            var code = await ShowOtpPopupAsync();
+            if (code is null)
+            {
+                Report("Login cancelled (OTP popup)");
+                return;
+            }
+            s.OneTimePassword = code;
+        }
+        else
+            s.OneTimePassword = "";
+
         this.settingsService.Save();
 
         // XIVLauncher.Core persists the account at login time (MainPage.Login calls
         // PersistAccount before the OAuth request), so pressing Login once registers
         // the account in accounts.toml and the Accounts menu; the Ok-path refreshes
         // the password. The OTP is never persisted (it changes every minute).
-        PersistAccount(s.Username, s.Password, !string.IsNullOrEmpty(s.OneTimePassword),
-            s.SteamAccount, s.FreeTrial, saveAsCurrent: true);
+        PersistAccount(s.Username, s.Password, isOtp, s.SteamAccount, s.FreeTrial, saveAsCurrent: true);
 
         // The login pipeline writes every step and every error into the log box;
         // show it now so failures are visible as they happen.
@@ -516,6 +532,74 @@ public partial class MainWindow : Window
             closeButton.Click += (_, __) => Dispatcher.UIThread.Post(() => window.Close());
             window.Show(this);
         });
+    }
+
+    /// <summary>OTP popup (spec: 6-digit prompt with Login/Cancel buttons). Returns the code
+    /// when its Login button presses with a valid 6-digit code, null when Cancel is pressed.
+    /// Enter in the code box triggers the same path as the Login button. Modal on the main window.</summary>
+    private async Task<string?> ShowOtpPopupAsync()
+    {
+        var tcs = new TaskCompletionSource<string?>();
+
+        var dialog = await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            var msg = new TextBlock
+            {
+                Text = "Enter the 6-digit code from your authenticator app:",
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(16, 16, 16, 8),
+            };
+            var codeBox = new TextBox { Margin = new Thickness(16, 0, 16, 4) };
+            var hint = new TextBlock { Text = "", Foreground = Brushes.Red, Margin = new Thickness(16, 0, 16, 4) };
+
+            var loginButton = new Button { Content = "Login", Padding = new Thickness(16, 6), Margin = new Thickness(0, 0, 8, 0) };
+            var cancelButton = new Button { Content = "Cancel", Padding = new Thickness(16, 6) };
+
+            var row = new DockPanel { LastChildFill = false, Margin = new Thickness(16, 8, 16, 16) };
+            DockPanel.SetDock(loginButton, Dock.Right);
+            DockPanel.SetDock(cancelButton, Dock.Right);
+            row.Children.Add(cancelButton);
+            row.Children.Add(loginButton);
+
+            var panel = new StackPanel();
+            panel.Children.Add(msg);
+            panel.Children.Add(codeBox);
+            panel.Children.Add(hint);
+            panel.Children.Add(row);
+
+            var window = new Window
+            {
+                Title = "One-Time Password",
+                Content = panel,
+                Width = 420,
+                Height = 190,
+                CanResize = false,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            };
+
+            void TryLogin()
+            {
+                var code = codeBox.Text;
+                if (code.Length != 6 || !code.All(char.IsDigit))
+                {
+                    hint.Text = "The code must be exactly 6 digits";
+                    return;
+                }
+                tcs.TrySetResult(code);
+                Dispatcher.UIThread.Post(() => window.Close());
+            }
+
+            loginButton.Click += (_, __) => TryLogin();
+            cancelButton.Click += (_, __) => { tcs.TrySetResult(null); Dispatcher.UIThread.Post(() => window.Close()); };
+            codeBox.KeyDown += (_, e) => { if (e.Key == Key.Enter) TryLogin(); };
+
+            window.Show(this);
+            return window;
+        });
+
+        var codeResult = await tcs.Task;
+        Dispatcher.UIThread.Post(() => dialog.Close());
+        return codeResult;
     }
 
     // ---- download progress popup ----------------------------------------------------

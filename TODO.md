@@ -38,7 +38,7 @@ Changes and additions to Settings window
 Changes to the main page
 
 ### Accounts
-* OTP code should be a true/false checkbox. If enabled, a popup should prompt for the 6-digit code with Login and Cancel buttons. Priority: High.
+* [DONE 2026-11-14 14:13 PT] OTP code should be a true/false checkbox. If enabled, a popup should prompt for the 6-digit code with Login and Cancel buttons. Priority: High.
 * Usernames should be unique. Do not allow multiple users named "test", for example. Priority: High
 * Switch accounts toml to a sqlite database instead. Priority: Medium
 * Add backends for saving passwords. File/Keychain. Examples in XIVLauncher.Core. Use Simple AED encrypt/decrypt to obfuscate passwords in file. Should also be a sqlite database. Priority: Medium

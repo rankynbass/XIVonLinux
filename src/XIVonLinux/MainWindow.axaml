@@ -55,8 +55,7 @@
                     <TextBox Name="UsernameBox" />
                     <TextBlock Text="Password" Margin="0,8,0,2" />
                     <TextBox Name="PasswordBox" PasswordChar="*" />
-                    <TextBlock Text="OTP" Margin="0,8,0,2" />
-                    <TextBox Name="OtpBox" />
+                    <CheckBox Content="OTP" Name="OtpCheck" Margin="0,12,0,0" />
                     <CheckBox Content="Steam account" Name="SteamAccountCheck" Margin="0,12,0,0" />
                     <CheckBox Content="Free trial" Name="FreeTrialCheck" Margin="0,2,0,0" />
                     <Button Content="Login" Name="LoginButton" Click="OnLogin" Margin="0,12,0,0" />
