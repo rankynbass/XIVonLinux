@@ -35,6 +35,12 @@ public sealed class LaunchSettings
 
     // Dalamud tab
     public bool DalamudEnabled { get; set; } = true;
+    public string LoadMethod { get; set; } = "EntryPoint"; // DalamudLoadMethod name: EntryPoint/DllInject/ACLonly
+    public string BranchTrack { get; set; } = "";     // Kamori branch track; empty = release
+    public string BranchKey { get; set; } = "";       // Kamori branch key, fetched with the track
+    public int LoadDelay { get; set; } = 0;           // injection delay in ms (--dalamud-delay-initialize)
+    public bool ManualInjectEnabled { get; set; }     // use a local injector build instead of the updater's
+    public string ManualInjectPath { get; set; } = "";
 
     // Login (not a tab; in-memory session state prefilled from accounts.db — settings.toml
     // persists only current_account, per Alex: identity comes from the database)
@@ -106,7 +112,13 @@ public sealed class SettingsService
         sb.AppendLine();
 
         sb.AppendLine("[dalamud]");
+        sb.AppendLine($"branch_key = {TomlString(this.Settings.BranchKey)}");
+        sb.AppendLine($"branch_track = {TomlString(this.Settings.BranchTrack)}");
         sb.AppendLine($"enabled = {this.Settings.DalamudEnabled.ToString().ToLowerInvariant()}");
+        sb.AppendLine($"load_delay = {this.Settings.LoadDelay}");
+        sb.AppendLine($"load_method = {TomlString(this.Settings.LoadMethod)}");
+        sb.AppendLine($"manual_inject_enabled = {this.Settings.ManualInjectEnabled.ToString().ToLowerInvariant()}");
+        sb.AppendLine($"manual_inject_path = {TomlString(this.Settings.ManualInjectPath)}");
         sb.AppendLine();
 
         sb.AppendLine("[login]");
@@ -168,6 +180,13 @@ public sealed class SettingsService
             return def;
         }
 
+        int GetInt(TomlTable? sec, string key, int def)
+        {
+            if (sec is not null && sec.ContainsKey(key) && sec[key] is int i)
+                return i;
+            return def;
+        }
+
         var game = Sec("game");
         var proton = Sec("proton");
         var dalamud = Sec("dalamud");
@@ -188,6 +207,12 @@ public sealed class SettingsService
         if (Get(proton, "extra_wine_dll_overrides", "extra_wine_dll_overrides") is string xw) s.ExtraWineDllOverrides = xw;
 
         s.DalamudEnabled = GetBool(dalamud, "enabled", "dalamud_enabled", s.DalamudEnabled);
+        if (Get(dalamud, "branch_key", "branch_key") is string bk) s.BranchKey = bk;
+        if (Get(dalamud, "branch_track", "branch_track") is string bt) s.BranchTrack = bt;
+        s.LoadDelay = GetInt(dalamud, "load_delay", s.LoadDelay);
+        if (Get(dalamud, "load_method", "load_method") is string lm) s.LoadMethod = lm;
+        s.ManualInjectEnabled = GetBool(dalamud, "manual_inject_enabled", "manual_inject_enabled", s.ManualInjectEnabled);
+        if (Get(dalamud, "manual_inject_path", "manual_inject_path") is string mp) s.ManualInjectPath = mp;
 
         if (Get(login, "current_account", "current_account") is string ca) s.CurrentAccountId = ca;
 

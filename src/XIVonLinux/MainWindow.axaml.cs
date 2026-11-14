@@ -48,6 +48,20 @@ public partial class MainWindow : Window
     private readonly UmuManager umuManager;
     private string umuRunPath = "/usr/sbin/umu-run";
 
+    /// <summary>Branch track the updater last ran with; a settings change to a
+    /// different track re-runs the updater in the background on close.</summary>
+    private string lastBranchTrack = "";
+
+    /// <summary>Fire-and-forget the updater for the saved branch (empty track = release).</summary>
+    private void RunDalamudUpdaterForBranch()
+    {
+        var s = this.settingsService.Settings;
+        this.dalamudUpdater.Run(
+            string.IsNullOrEmpty(s.BranchTrack) ? null : s.BranchTrack,
+            string.IsNullOrEmpty(s.BranchKey) ? null : s.BranchKey);
+        this.lastBranchTrack = s.BranchTrack;
+    }
+
     /// <summary>umu-run to invoke, resolved from settings: the managed latest/previous
     /// tag picked in the Proton tab, the custom picked folder's umu-run, falling back
     /// to the newest managed install, then the system binary.</summary>
@@ -121,7 +135,7 @@ public partial class MainWindow : Window
         {
             Overlay = new SilentDalamudOverlay(),
         };
-        this.dalamudUpdater.Run(null, null);   // fire-and-forget background check/download
+        RunDalamudUpdaterForBranch();   // fire-and-forget background check/download for the saved branch
 
         StartNewsLoad();
     }
@@ -134,6 +148,9 @@ public partial class MainWindow : Window
     {
         var dlg = new SettingsWindow(this.settingsService);
         await dlg.ShowDialog(this);
+        var s = this.settingsService.Settings;
+        if (s.BranchTrack != this.lastBranchTrack)
+            RunDalamudUpdaterForBranch();   // branch changed: re-fetch in the background
         this.Focus();
     }
 
@@ -1068,6 +1085,19 @@ public partial class MainWindow : Window
     private void LaunchWithDansharing(UmuPrefix prefix, LoginService service, FileInfo gameExe, DirectoryInfo gamePath, XivGame.LoginResult result, ClientLanguage lang, bool isSteam)
     {
         var injectorExe = this.dalamudUpdater.Runner;
+        if (this.settingsService.Settings.ManualInjectEnabled)
+        {
+            // Manual override: a local build folder containing Dalamud.Injector.exe
+            // (validated on settings save), used instead of the updater's download.
+            var local = Path.Combine(this.settingsService.Settings.ManualInjectPath, "Dalamud.Injector.exe");
+            if (!File.Exists(local))
+            {
+                Report($"FAIL: manual injector missing at {local}");
+                return;
+            }
+            injectorExe = new FileInfo(local);
+            Report($"Manual injector: {local}");
+        }
         if (!File.Exists(injectorExe.FullName))
         {
             Report($"FAIL: injector exe missing at {injectorExe.FullName}");
@@ -1085,7 +1115,7 @@ public partial class MainWindow : Window
             PluginDirectory = Path.Combine(storage, "installedPlugins"),
             AssetDirectory = this.dalamudUpdater.AssetDirectory!.FullName,
             Language = lang,
-            DelayInitializeMs = 0,
+            DelayInitializeMs = this.settingsService.Settings.LoadDelay,
         };
 
         // Wine .NET runtime for the in-prefix injector (M1-verified env shape; Wine-style paths).
@@ -1104,10 +1134,16 @@ public partial class MainWindow : Window
         var gameArgs = service.BuildEncryptedGameArgs(result, gamePath, service.GameConfigFolder(), isSteam);
 
         Interlocked.Increment(ref activeLaunches);
-        Report("In-prefix injector: SE login session + DllInject");
+        var loadMethod = this.settingsService.Settings.LoadMethod switch
+        {
+            "EntryPoint" => DalamudLoadMethod.EntryPoint,
+            "ACLonly" => DalamudLoadMethod.ACLonly,
+            _ => DalamudLoadMethod.DllInject,
+        };
+        Report($"In-prefix injector: SE login session + {loadMethod} + delay {startInfo.DelayInitializeMs}ms");
         var runner = new LinuxDalamudRunner(prefix, this.umuRunPath);
         var proc = runner.Run(injectorExe, false, false, false, gameExe, gameArgs, "", env,
-            DalamudLoadMethod.DllInject, startInfo);
+            loadMethod, startInfo);
 
         if (proc is null)
         {

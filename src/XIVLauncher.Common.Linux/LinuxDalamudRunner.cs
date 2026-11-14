@@ -120,8 +120,11 @@ public sealed class LinuxDalamudRunner : IDalamudRunner
         return output.Substring(start, end - start + 1);
     }
 
-    /// <summary>Injection mode string passed to the injector (--mode=).</summary>
-    private static string LoadMethodString(DalamudLoadMethod loadMethod) => "inject";
+    /// <summary>Injection mode string passed to the injector (--mode=). Unix runner
+    /// mapping: EntryPoint uses the post-start entrypoint mode, DllInject/ACLonly both
+    /// use "inject"; ACLonly additionally adds --without-dalamud (see below).</summary>
+    private static string LoadMethodString(DalamudLoadMethod loadMethod) =>
+        loadMethod == DalamudLoadMethod.EntryPoint ? "entrypoint" : "inject";
 
     private List<string> BuildInjectorArgs(FileInfo runnerExe, FileInfo gameExe, string gameArgs,
         IDictionary<string, string> environment, DalamudStartInfo startInfo, DalamudLoadMethod loadMethod,
@@ -148,6 +151,8 @@ public sealed class LinuxDalamudRunner : IDalamudRunner
             DalamudInjectorArgs.DelayInitialize(startInfo.DelayInitializeMs),
         };
 
+        if (loadMethod == DalamudLoadMethod.ACLonly)
+            args.Add(DalamudInjectorArgs.WITHOUT_DALAMUD);
         if (noThirdPlugins)
             args.Add(DalamudInjectorArgs.NO_THIRD_PARTY);
         if (noPlugins)

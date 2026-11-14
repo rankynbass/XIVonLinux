@@ -74,9 +74,27 @@
             </TabItem>
 
             <TabItem Header="Dalamud">
-                <StackPanel Margin="0,12,0,0">
-                    <CheckBox Content="Enable Dalamud" Name="DalamudCheck" HorizontalAlignment="Left" />
-                </StackPanel>
+                <Grid Margin="0,12,0,0" ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+
+                    <CheckBox Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Content="Enable Dalamud" Name="DalamudCheck"
+                              HorizontalAlignment="Left" Margin="0,0,0,6" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Load Method" VerticalAlignment="Center" Margin="0,0,12,6" />
+                    <ComboBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Name="LoadMethodCombo" Margin="0,0,0,6" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Dalamud Branch" VerticalAlignment="Center" Margin="0,0,12,6" />
+                    <ComboBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Name="BranchCombo" Margin="0,0,0,6" />
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Injection Delay (ms)" VerticalAlignment="Center" Margin="0,0,12,6" />
+                    <TextBox Grid.Row="3" Grid.Column="1" Name="InjectionDelayBox" Margin="0,0,8,6" />
+
+                    <CheckBox Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Content="Manual injection (local injector build)" Name="ManualInjectCheck"
+                              HorizontalAlignment="Left" Margin="0,0,0,6" IsCheckedChanged="OnManualInjectToggled" />
+
+                    <TextBlock Grid.Row="5" Grid.Column="0" Text="Manual Inject Path" Name="ManualInjectLabel" VerticalAlignment="Center" Margin="0,0,12,6" />
+                    <TextBox Grid.Row="5" Grid.Column="1" Name="ManualInjectPathBox" Margin="0,0,8,6" />
+                    <Button Grid.Row="5" Grid.Column="2" Content="Browse" Name="ManualInjectBrowseButton" Click="OnBrowseManualInject" Margin="0,0,0,6" />
+                </Grid>
             </TabItem>
 
         </TabControl>

@@ -1,8 +1,11 @@
 using System;
 using System.IO;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
+using XIVLauncher.Common.Dalamud;
 using XIVLauncher.Common.Linux;
 
 namespace XIVonLinux;
@@ -10,6 +13,20 @@ namespace XIVonLinux;
 public partial class SettingsWindow : Window
 {
     private readonly SettingsService settingsService;
+
+    /// <summary>Loaded Kamori branch metadata (index-aligned with BranchCombo entries).</summary>
+    private readonly List<DalamudBranchMeta.Branch> branches = new();
+
+    /// <summary>Kamori needs a User-Agent on every request (shared client convention).</summary>
+    private static readonly HttpClient BranchHttp = CreateBranchClient();
+
+    private static HttpClient CreateBranchClient()
+    {
+        var c = new HttpClient();
+        c.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent",
+            "XIVonLinux/0.1 (FFXIV launcher; https://github.com/rankynbass/XIVonLinux)");
+        return c;
+    }
 
     public SettingsWindow()
     {
@@ -36,6 +53,31 @@ public partial class SettingsWindow : Window
         if (LanguageCombo.SelectedItem is null)
             LanguageCombo.SelectedIndex = 0;
         DalamudCheck.IsChecked = s.DalamudEnabled;
+
+        // Dalamud tab (XIVLauncher.Core parity): load method, branch, injection delay,
+        // manual injector override. Combo Tags carry the DalamudLoadMethod enum names.
+        LoadMethodCombo.Items.Add(new ComboBoxItem { Content = "Entrypoint", Tag = "EntryPoint" });
+        LoadMethodCombo.Items.Add(new ComboBoxItem { Content = "DLL Injection", Tag = "DllInject" });
+        LoadMethodCombo.Items.Add(new ComboBoxItem { Content = "ACL-only fix", Tag = "ACLonly" });
+        foreach (var item in LoadMethodCombo.Items)
+            if ((item as ComboBoxItem)?.Tag as string == s.LoadMethod)
+                LoadMethodCombo.SelectedItem = item;
+        if (LoadMethodCombo.SelectedItem is null)
+            LoadMethodCombo.SelectedIndex = 0;   // Entrypoint default
+        InjectionDelayBox.Text = s.LoadDelay.ToString();
+        ManualInjectCheck.IsChecked = s.ManualInjectEnabled;
+        ManualInjectPathBox.Text = s.ManualInjectPath;
+        ApplyManualInjectMode(s.ManualInjectEnabled);
+
+        // Branch combo fills once Kamori meta arrives, like XIVLauncher.Core's
+        // DalamudBranchMetaSettingsEntry (created disabled, populated on fetch).
+        // Item Tags carry the branch Track; item 0 is the synthetic Release entry
+        // (Track "", i.e. the updater's default release path).
+        BranchCombo.Items.Add(new ComboBoxItem { Content = "Release", Tag = "" });
+        BranchCombo.SelectedIndex = 0;
+        if (!string.IsNullOrEmpty(s.BranchTrack))
+            BranchCombo.Items[^1] = new ComboBoxItem { Content = s.BranchTrack, Tag = s.BranchTrack };
+        _ = LoadBranchesAsync();
 
         // Proton enumeration (Alex): managed mode picks from the Proton builds found in
         // Steam compatibilitytools.d, steamapps/common, and the app's tools/proton dir.
@@ -180,6 +222,77 @@ public partial class SettingsWindow : Window
             box.Text = folders[0].Path.LocalPath;
     }
 
+    /// <summary>Fetches Kamori branch metadata once, then fills BranchCombo with the
+    /// non-hidden branches (item Tags carry Track; the saved Track pre-selects).</summary>
+    private async Task LoadBranchesAsync()
+    {
+        IEnumerable<DalamudBranchMeta.Branch> fetched;
+        try
+        {
+            fetched = await DalamudBranchMeta.FetchBranchesAsync(BranchHttp);
+        }
+        catch
+        {
+            return;   // keep the Release-only combo; saving the current selection is fine
+        }
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            foreach (var b in fetched)
+                if (!b.Hidden)
+                    this.branches.Add(b);
+
+            BranchCombo.Items.Clear();
+            BranchCombo.Items.Add(new ComboBoxItem { Content = "Release", Tag = "" });
+            foreach (var b in this.branches)
+                BranchCombo.Items.Add(new ComboBoxItem { Content = b.DisplayName, Tag = b.Track });
+
+            var saved = this.settingsService.Settings.BranchTrack;
+            for (var i = 0; i < BranchCombo.Items.Count; i++)
+                if ((BranchCombo.Items[i] as ComboBoxItem)?.Tag as string == saved)
+                {
+                    BranchCombo.SelectedIndex = i;
+                    return;
+                }
+            BranchCombo.SelectedIndex = 0;
+        });
+    }
+
+    /// <summary>Manual-injection rows show only when the override is checked.</summary>
+    private void ApplyManualInjectMode(bool enabled)
+    {
+        ManualInjectLabel.IsVisible = enabled;
+        ManualInjectPathBox.IsVisible = enabled;
+        ManualInjectBrowseButton.IsVisible = enabled;
+    }
+
+    private void OnManualInjectToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => ApplyManualInjectMode(ManualInjectCheck.IsChecked == true);
+
+    private async void OnBrowseManualInject(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => await PickFolderAsync(ManualInjectPathBox);
+
+    /// <summary>Modal alert on this window; OK closes it.</summary>
+    private void ShowAlert(string message)
+    {
+        var popup = new Window
+        {
+            Title = "XIVonLinux",
+            Width = 420,
+            Height = 140,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var ok = new Button { Content = "OK", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, Margin = new Avalonia.Thickness(0, 12, 0, 0) };
+        ok.Click += (_, _) => popup.Close();
+        popup.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(16, 12, 16, 12),
+            Children = { new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap }, ok },
+        };
+        popup.ShowDialog(this);
+    }
+
     /// <summary>Persist all settings, close the modal; the main window refocuses afterwards.</summary>
     private void OnSave(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
@@ -203,6 +316,23 @@ public partial class SettingsWindow : Window
         s.EnableDxvk = DxvkCheck.IsChecked == true;
         s.ExtraWineDllOverrides = ExtraWineDllOverridesBox.Text;
         s.DalamudEnabled = DalamudCheck.IsChecked == true;
+
+        // Dalamud tab: load method name, delay, branch, manual injector path.
+        s.LoadMethod = (LoadMethodCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "DllInject";
+        s.LoadDelay = int.TryParse(InjectionDelayBox.Text, out var delay) && delay >= 0 ? delay : 1000;
+        s.ManualInjectEnabled = ManualInjectCheck.IsChecked == true;
+        s.ManualInjectPath = ManualInjectPathBox.Text;
+        if (s.ManualInjectEnabled &&
+            (string.IsNullOrEmpty(s.ManualInjectPath) || !Directory.Exists(s.ManualInjectPath) ||
+             !File.Exists(Path.Combine(s.ManualInjectPath, "Dalamud.Injector.exe"))))
+        {
+            ShowAlert("Manual injection needs a folder containing Dalamud.Injector.exe.\nFix the path, or untick manual injection.");
+            return;   // do not persist/close with an invalid override
+        }
+        var selBranch = (BranchCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+        s.BranchTrack = selBranch;
+        s.BranchKey = this.branches.Find(b => b.Track == selBranch)?.Key ?? "";
+
         this.settingsService.Save();
         Close();
     }
