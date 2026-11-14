@@ -1,7 +1,7 @@
-namespace XIVLauncher.Common.Linux;
+namespace XIVonLinux;
 
-/// <summary>Library-side login request DTO: the app passes plain values in, never the
-/// app's settings object. Password/OTP are in-memory only; the service never persists them.</summary>
+/// <summary>App-side login request DTO: built from the login UI fields.
+/// Password/OTP are in-memory only; the service never persists them.</summary>
 public sealed class LoginRequest
 {
     public string Username { get; init; } = "";

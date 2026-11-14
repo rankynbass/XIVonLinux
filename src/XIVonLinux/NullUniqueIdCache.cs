@@ -1,10 +1,10 @@
 using XIVLauncher.Common.PlatformAbstractions;
 
-namespace XIVLauncher.Common.Linux;
+namespace XIVonLinux;
 
 /// <summary>
-/// No-op unique-ID cache (Launcher's SE-login uid cache; not touched by LaunchGame).
-/// Replaced by a real config-backed cache in Milestone 4 (SE login).
+/// App-layer no-op unique-ID cache, passed to Launcher/XivGame for the SE-credential
+/// path (Launcher's uid cache is not consulted by SE login nor by LaunchGame).
 /// </summary>
 public sealed class NullUniqueIdCache : IUniqueIdCache
 {

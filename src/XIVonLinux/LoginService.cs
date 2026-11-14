@@ -15,17 +15,19 @@ using XIVLauncher.Common.Game.Patch;
 using XIVLauncher.Common.Game.Patch.Acquisition;
 using XIVLauncher.Common.Game.Patch.Acquisition.Aria;
 using XIVLauncher.Common.Game.Patch.PatchList;
+using XIVLauncher.Common.Linux;
 using XIVLauncher.Common.Util;
 
-namespace XIVLauncher.Common.Linux;
+namespace XIVonLinux;
 
 /// <summary>
-/// Milestone 4: real Square Enix login + patching for XIVonLinux.
-/// Wraps XIVLauncher.Common Launcher (OauthLogin -> RegisterSession -> LoginResult)
-/// and the shared patch pipeline (AriaPatchAcquisition + PatchInstaller + PatchManager).
-/// Steam-account login is not supported yet (LinuxSteamStub is not a real Steamworks
-/// binding — Launcher throws SteamException when isSteam is true), so login runs with
-/// SE credentials only. Credentials are passed in-memory and never persisted.
+/// App-layer login + patching service (moved out of XIVLauncher.Common.Linux,
+/// 2026-11-14). Wraps XIVLauncher.Common Launcher (OauthLogin -> RegisterSession ->
+/// LoginResult) and the shared patch pipeline (AriaPatchAcquisition + PatchInstaller +
+/// PatchManager). Steam-account login is not supported yet (LinuxSteamStub is not a
+/// real Steamworks binding — Launcher throws SteamException when isSteam is true), so
+/// login runs with SE credentials only. Credentials are passed in-memory and never
+/// persisted.
 /// </summary>
 public sealed class LoginService : IDisposable
 {
@@ -36,8 +38,8 @@ public sealed class LoginService : IDisposable
     private readonly ClientLanguage language;
     private AriaPatchAcquisition? acquisition;
 
-    /// <summary>Library-side service: takes plain values (XIVLauncher.Common.Storage,
-    /// the character-config folder path), never the app's settings object.
+    /// <summary>App-layer service: takes plain values (XIVLauncher.Common.Storage,
+    /// the character-config folder path), not the settings object itself.
     /// frontierUrl is the launcher's frontier URL template (two format holes:
     /// lang, time) fetched from the launcher client config.</summary>
     public LoginService(Storage storage, string configPath, UmuPrefix prefix, ClientLanguage language = ClientLanguage.English,
