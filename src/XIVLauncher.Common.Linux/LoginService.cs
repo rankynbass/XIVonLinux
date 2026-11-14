@@ -29,8 +29,6 @@ namespace XIVLauncher.Common.Linux;
 /// </summary>
 public sealed class LoginService : IDisposable
 {
-    private const string FrontierUrlTemplate = "https://sqex-fragment.legacy.net/v650/index.html?rc_lang=en&time={1}";
-
     private readonly Launcher launcher;
     private readonly Storage storage;
     private readonly string configPath;
@@ -39,14 +37,17 @@ public sealed class LoginService : IDisposable
     private AriaPatchAcquisition? acquisition;
 
     /// <summary>Library-side service: takes plain values (XIVLauncher.Common.Storage,
-    /// the character-config folder path), never the app's settings object.</summary>
-    public LoginService(Storage storage, string configPath, UmuPrefix prefix, ClientLanguage language = ClientLanguage.English)
+    /// the character-config folder path), never the app's settings object.
+    /// frontierUrl is the launcher's frontier URL template (two format holes:
+    /// lang, time) fetched from the launcher client config.</summary>
+    public LoginService(Storage storage, string configPath, UmuPrefix prefix, ClientLanguage language = ClientLanguage.English,
+        string frontierUrl = "https://launcher.finalfantasyxiv.com/v740/index.html?rc_lang={0}&time={1}")
     {
         this.storage = storage;
         this.configPath = configPath;
         this.prefix = prefix;
         this.language = language;
-        this.launcher = new Launcher(new SteamworksSteam(), new NullUniqueIdCache(), FrontierUrlTemplate, "en");
+        this.launcher = new Launcher(new SteamworksSteam(), new NullUniqueIdCache(), frontierUrl, "en");
     }
 
     /// <summary>Launch gate/login-server availability (upstream GetGateStatus shape).</summary>

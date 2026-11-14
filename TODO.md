@@ -13,7 +13,7 @@ Changes and additions to Settings window
 
 ### Dalamud
 * Match features of XIVLauncher.Core. Priority: Medium
-* Make sure that dalamud is obeying the killswitch (disabled for patch days, etc). Priority: Very High
+* [DONE 2026-11-14 14:00 PT] Make sure that dalamud is obeying the killswitch (disabled for patch days, etc). Priority: Very High
 
 ### Game
 * Add search feature to find the game. Search paths ~/.xlcore/ffxiv, ~/.local/share/Steam/steamapps/common, ~/Games. Allow the user to pick one if multiple are found. Priority: Low

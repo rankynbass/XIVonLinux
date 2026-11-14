@@ -25,8 +25,12 @@ namespace XIVonLinux;
 
 public partial class MainWindow : Window
 {
-    // Launcher's frontier URL template (upstream LauncherApp shape; LaunchGame does not use it).
-    private const string FrontierUrlTemplate = "https://sqex-fragment.legacy.net/v650/index.html?rc_lang=en&time={1}";
+    // Launcher client config (Kamori GetLauncherClientConfig), fetched at startup:
+    // frontier URL template (two holes: lang, time) + killswitch boot-version cutoff.
+    // Plain values handed to the library at call sites (layering rule).
+    private string frontierUrl = XIVonLinux.Net.LauncherClientConfig.FallbackFrontierUrl;
+    private string? cutOffBootver;
+    private uint flags;
 
     private int activeLaunches;
     private readonly SettingsService settingsService;
@@ -45,6 +49,18 @@ public partial class MainWindow : Window
 
         // Title bar carries the assembly version injected by VersionSourceGenerator.
         Title = $"XIVonLinux {AppUtil.VersionInfo.Instance().Version.FileVersion}";
+
+        // Fetch launcher client config in the background (frontier template + killswitch
+        // cutoff); enforced at login time, XIVLauncher.Core LauncherApp shape.
+        _ = Task.Run(async () =>
+        {
+            var config = await XIVonLinux.Net.LauncherClientConfig.GetAsync(NewsHttp);
+            this.frontierUrl = config.frontierUrl;
+            this.cutOffBootver = config.cutOffBootver;
+            this.flags = config.flags;
+            Log.Information("LauncherClientConfig: frontier={Frontier} cutOffBootver={Cutoff} flags={Flags}",
+                config.frontierUrl, config.cutOffBootver, config.flags);
+        });
 
         this.settingsService = new SettingsService();
         this.accounts = new AccountManager(this.settingsService);
@@ -286,7 +302,7 @@ public partial class MainWindow : Window
     /// then shows them on the UI thread (NewsFrame shape from XIVLauncher.Core).
     private void StartNewsLoad()
     {
-        newsService = new LoginService(settingsService.Storage, settingsService.Settings.ConfigPath, null!, ClientLanguage.English);
+        newsService = new LoginService(settingsService.Storage, settingsService.Settings.ConfigPath, null!, ClientLanguage.English, this.frontierUrl);
         var svc = newsService;
 
         _ = Task.Run(async () =>
@@ -436,6 +452,72 @@ public partial class MainWindow : Window
         return cont;
     }
 
+    /// <summary>Environment flag reader tolerant of 1/0 (bool.Parse, used by the submodule's
+    /// CheckEnvBool, accepts only true/false and throws on 1).</summary>
+    private static bool EnvBool(string var)
+    {
+        var v = Environment.GetEnvironmentVariable(var);
+        return v is "1" || string.Equals(v, "true", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Killswitch gate (XIVLauncher.Core LauncherApp shape): when the server-published
+    /// cutoff is below the local boot version, the login protocol changed during a recent patch
+    /// and the launcher refuses to log in. XL_NO_KILLSWITCH=1 bypasses (EnvironmentSettings).</summary>
+    private string? KillswitchCheck(string gamePathFull)
+    {
+        if (EnvBool("XL_NO_KILLSWITCH"))
+            return null;
+        if (string.IsNullOrEmpty(cutOffBootver))
+            return null;
+
+        var bootVer = Repository.Boot.GetVer(new DirectoryInfo(gamePathFull));
+        var boot = SeVersion.Parse(bootVer);
+        var cutoff = SeVersion.Parse(cutOffBootver);
+
+        if (boot.CompareTo(cutoff) > 0)
+            return "XIVonLinux is unavailable at this time as there were changes to the login process during a recent patch." +
+                   "\n\nWe need to adjust to these changes and verify that our adjustments are safe before we can re-enable the launcher." +
+                   "\n\nYou can use the Official Launcher instead until XIVonLinux has been updated." +
+                   $"\n\n(local boot: {bootVer}, cutoff: {cutOffBootver})";
+        return null;
+    }
+
+    /// <summary>Single-button killswitch message popup (same window shape as ShowInstallConfirmAsync).</summary>
+    private async Task ShowKillswitchPopupAsync(string message)
+    {
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            var msg = new TextBlock
+            {
+                Text = message,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(16, 16, 16, 12),
+            };
+
+            var closeButton = new Button { Content = "Close", Padding = new Thickness(16, 6) };
+            var row = new DockPanel { LastChildFill = false, Margin = new Thickness(16, 0, 16, 16) };
+            DockPanel.SetDock(closeButton, Dock.Right);
+            row.Children.Add(closeButton);
+
+            var panel = new StackPanel();
+            panel.Children.Add(msg);
+            panel.Children.Add(row);
+
+            var window = new Window
+            {
+                Title = "Killswitch",
+                Content = panel,
+                Width = 520,
+                Height = 280,
+                CanResize = false,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            };
+
+            closeButton.Click += (_, __) => Dispatcher.UIThread.Post(() => window.Close());
+            window.Show(this);
+        });
+    }
+
     // ---- download progress popup ----------------------------------------------------
     // A non-modal popup showing up to 5 live download bars. Rows are rebuilt each
     // second from LoginService.ProgressSnapshot: in-progress slots show bytes/speed
@@ -562,6 +644,14 @@ public partial class MainWindow : Window
         try
         {
             var s = this.settingsService.Settings;
+            // Killswitch flags bitmask (XIVLauncher LeaseFeatureFlags): bit 0 = GlobalDisableDalamud,
+            // launched without the in-game addon on patch days, regardless of the user setting.
+            if ((flags & 1) != 0 && withDalamud)
+            {
+                Report("GlobalDisableDalamud flag set — launching without Dalamud");
+                withDalamud = false;
+            }
+
             Report($"Pipeline start (login, dalamud: {withDalamud})");
 
             var prefixRoot = string.IsNullOrEmpty(s.PrefixPath)
@@ -573,6 +663,16 @@ public partial class MainWindow : Window
             var gameExe = new FileInfo(Path.Combine(gamePath.FullName, "game", "ffxiv_dx11.exe"));
             var gameInstalled = File.Exists(gameExe.FullName);
             Report($"Game location: {gamePath.FullName}");
+
+            // Killswitch gate (XIVLauncher.Core LauncherApp shape): server-published
+            // cutoff vs local boot version — login protocol changed on patch days.
+            var killswitch = KillswitchCheck(gamePath.FullName);
+            if (killswitch is not null)
+            {
+                Report($"KILL SWITCH: boot {Repository.Boot.GetVer(gamePath)} > cutoff {cutOffBootver} — login refused.");
+                await ShowKillswitchPopupAsync(killswitch);
+                return;
+            }
 
             var proton = s.ProtonPath;
             if (string.IsNullOrEmpty(proton) || !Directory.Exists(proton))
@@ -608,7 +708,7 @@ public partial class MainWindow : Window
             Report("Prefix ready");
 
             var lang = Enum.TryParse<ClientLanguage>(s.Language, out var l) ? l : ClientLanguage.English;
-            service = new LoginService(this.settingsService.Storage, this.settingsService.Settings.ConfigPath, prefix, lang);
+            service = new LoginService(this.settingsService.Storage, this.settingsService.Settings.ConfigPath, prefix, lang, this.frontierUrl);
             Report($"Client language: {lang}");
 
             Report("Checking login gate ...");
@@ -757,7 +857,7 @@ public partial class MainWindow : Window
     private void LaunchPlain(UmuPrefix prefix, LoginService service, DirectoryInfo gamePath, XivGame.LoginResult result, ClientLanguage lang, bool isSteam)
     {
         var gameRunner = new LinuxGameRunner(prefix);
-        var game = new XivGame(new LinuxSteamStub(), new NullUniqueIdCache(), FrontierUrlTemplate, "en");
+        var game = new XivGame(new LinuxSteamStub(), new NullUniqueIdCache(), this.frontierUrl, "en");
 
         var userPathWine = prefix.UnixToWinePath(service.GameConfigFolder().FullName);
         Report("LaunchGame (login session, encrypted args)");
