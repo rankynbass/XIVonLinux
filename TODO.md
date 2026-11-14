@@ -55,4 +55,7 @@ Changes to the main page
 ### Storage structure
 * All logs should go in the STORAGE/logs folder. This includes dalamud logs, launcher logs, wine/proton logs, etc. Priority: Medium, before tspacks.
 
+### Add Troubleshoot button
+* Have a dropdown for disabling dalamud, third party plugins, etc. Refer to XIVLauncher.Core for details. Priority: Medium.
+
 
