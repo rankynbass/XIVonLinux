@@ -211,27 +211,22 @@ public partial class MainWindow : Window
             this.accounts.CurrentAccount = account;
     }
 
-    /// <summary>XIVLauncher.Core PersistAccount shape: merge the login fields into the
-    /// account store (password stays in memory) and set the current account. The OTP is
-    /// NOT remembered — it changes every minute, so saving it is useless.</summary>
+    /// <summary>Unique-username persist (accounts.db, user_name PRIMARY KEY): a login
+    /// registers the username once; re-logins with the same username update the stored
+    /// flags (OTP/Steam/trial) instead of adding a second account. Password stays in
+    /// memory only. The OTP is not persisted — it changes every minute.</summary>
     private void PersistAccount(string username, string password, bool isOtp, bool isSteam, bool isFreeTrial,
         bool saveAsCurrent = false)
     {
         if (string.IsNullOrEmpty(username))
             return;
 
-        var current = this.accounts.CurrentAccount;
-        if (current is not null && current.UserName.Equals(username, StringComparison.OrdinalIgnoreCase))
-        {
-            current.Password = password;
-            if (current.IsFreeTrial != isFreeTrial)
-                this.accounts.UpdateFreeTrial(current, isFreeTrial);
-        }
+        username = username.ToLower();
 
-        var id = $"{username.ToLower()}-{isOtp}-{isSteam}";
-        if (current is null || current.Id != id)
+        var existing = this.accounts.ByUserName(username);
+        if (existing is null)
         {
-            var accountToSave = new XivAccount(username)
+            existing = new XivAccount(username)
             {
                 Password = password,
                 SavePassword = false,
@@ -239,13 +234,19 @@ public partial class MainWindow : Window
                 UseSteamServiceAccount = isSteam,
                 IsFreeTrial = isFreeTrial,
             };
-            this.accounts.AddAccount(accountToSave);
-            this.accounts.CurrentAccount = accountToSave;
-            current = accountToSave;
+            this.accounts.AddAccount(existing);
+        }
+        else
+        {
+            existing.Password = password;
+            existing.UseOtp = isOtp;
+            existing.UseSteamServiceAccount = isSteam;
+            existing.IsFreeTrial = isFreeTrial;
+            this.accounts.UpdateAccountFlags(existing);
         }
 
         if (saveAsCurrent)
-            this.accounts.CurrentAccount = current;
+            this.accounts.CurrentAccount = existing;
     }
 
     // ---------- login ----------

@@ -1,9 +1,10 @@
 namespace XIVonLinux;
 
-/// <summary>A saved login account, persisted as one [[account]] table in
-/// ~/.xivonlinux/accounts.toml. The password is NOT stored on disk (Alex's rule:
-/// credentials are never persisted) — it is held in memory on this object only,
-/// populated when the user logs in, and never written by AccountManager.Save().</summary>
+/// <summary>A saved login account, persisted as one row in the accounts table of
+/// ~/.xivonlinux/accounts.db (user_name PRIMARY KEY — usernames are unique). The
+/// password is NOT stored on disk (Alex's rule: credentials are never persisted) — it is
+/// held in memory on this object only, populated when the user logs in, and never
+/// written by AccountManager.</summary>
 public sealed class XivAccount
 {
     public string Id => $"{UserName}-{UseOtp}-{UseSteamServiceAccount}";

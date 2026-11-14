@@ -38,7 +38,7 @@ public sealed class LaunchSettings
     public string OneTimePassword { get; set; } = ""; // UI-only, never persisted
     public bool SteamAccount { get; set; } = true;
     public bool FreeTrial { get; set; }
-    public string? CurrentAccountId { get; set; }     // accounts.toml account the launcher pre-selects
+    public string? CurrentAccountId { get; set; }     // accounts.db user_name the launcher pre-selects
 }
 
 /// <summary>
