@@ -50,9 +50,9 @@ Changes to the main page
 * [DONE 2026-11-14 21:50 PT via d6852f5] Fix the download popup. It should always show at least one bar as long as something is downloading. Make 5 bars: The first bar should be the longest, and an overall progress bar. The remaining bars should be for downloading files, min 0 (if nothing downloading), max 4. If there are between 1 and 3 files still downloading, show that many download bars. If 4 or more, show 4. Priority: Medium
 
 ## Obey XDG spec
-* Make the main settings files (.toml files, any db files, etc) in ~/.config/xivonlinux. Priority: Low
-* Patches and temporary downloads should be in ~/.cache/xivonlinux. Priority: Low
-* Main storage should be ~/.local/share/xivonlinux. Priority: Medium
+* [DONE 2026-11-14 22:15 PT via caa0eed] Make the main settings files (.toml files, any db files, etc) in ~/.config/xivonlinux. Priority: Low
+* [DONE 2026-11-14 22:15 PT via caa0eed] Patches and temporary downloads should be in ~/.cache/xivonlinux. Priority: Low
+* [DONE 2026-11-14 22:15 PT via caa0eed] Main storage should be ~/.local/share/xivonlinux. Priority: Medium
 
 ### Storage structure
 * [DONE 2026-11-14 18:14 PT via 2df9e7d, 28923c0] All logs should go in the STORAGE/logs folder. This includes dalamud logs, launcher logs, wine/proton logs, etc. Priority: Medium, before tspacks.
