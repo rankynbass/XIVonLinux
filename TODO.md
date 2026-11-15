@@ -47,7 +47,7 @@ Changes to the main page
 
 ### UI fixes
 * [DONE 2026-11-14 20:55 PT via 554a9cc] Move the Settings/Show logs buttons to the right. So the news frame should be on the left side, with the login on upper right, and settings/log buttons on bottom right. This should allow the whole news frame to show without scroll bar by default. Priority: Medium
-* Fix the download popup. It should always show at least one bar as long as something is downloading. Make 5 bars: The first bar should be the longest, and an overall progress bar. The remaining bars should be for downloading files, min 0 (if nothing downloading), max 4. If there are between 1 and 3 files still downloading, show that many download bars. If 4 or more, show 4. Priority: Low
+* Fix the download popup. It should always show at least one bar as long as something is downloading. Make 5 bars: The first bar should be the longest, and an overall progress bar. The remaining bars should be for downloading files, min 0 (if nothing downloading), max 4. If there are between 1 and 3 files still downloading, show that many download bars. If 4 or more, show 4. Priority: Medium
 
 ## Obey XDG spec
 * Make the main settings files (.toml files, any db files, etc) in ~/.config/xivonlinux. Priority: Low

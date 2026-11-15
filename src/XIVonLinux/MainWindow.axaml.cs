@@ -141,6 +141,13 @@ public partial class MainWindow : Window
         RunDalamudUpdaterForBranch();   // fire-and-forget background check/download for the saved branch
 
         StartNewsLoad();
+
+        // Fake download test mode: opens the popup with 40 simulated patches (no
+        // network) so the 5-bar layout can be exercised without a real download.
+        // Deferred to Opened: the popup Show()s against this window as owner, which
+        // requires the main window to be shown first.
+        if (Environment.GetEnvironmentVariable("XIVON_FAKE_DOWNLOADS") == "1")
+            this.Opened += (_, __) => OpenFakeProgressPopup();
     }
 
     // ---------- settings modal ----------
@@ -718,6 +725,22 @@ public partial class MainWindow : Window
     private StackPanel? progressPanel;
     private TextBlock? progressSummary;
 
+    // Fake download test mode (XIVON_FAKE_DOWNLOADS=1): 40 simulated patches, 4 slots,
+    // no network — exercises the 5-bar popup layout. Slot s downloads patches at
+    // (2+s) MB/s; each finished patch verifies for 2 ticks.
+    private sealed class FakePatch
+    {
+        public string VersionId = "";
+        public long Length;
+        public long Downloaded;
+        public int VerifyTicks;
+        public bool Done;
+    }
+
+    private const int FakeCount = 40;
+    private List<FakePatch>? fakePatches;
+    private int[] fakeSlotIdx = new int[4];
+
     private void OpenProgressPopup(string title)
     {
         progressWindow = new Window
@@ -765,24 +788,76 @@ public partial class MainWindow : Window
         if (progressPanel is null || progressSummary is null)
             return;
 
+        List<LoginService.DownloadSlotInfo> rows;
+        int done, totalFiles, queued;
+        double speed;
+        long totalBytes, downloadedBytes;
+
         var patcher = LoginService.CurrentPatcher;
-        var rows = LoginService.ProgressSnapshot(patcher);
+        if (fakePatches is not null)
+        {
+            AdvanceFakeProgress();
+            rows = FakeRows();
+            done = fakePatches.Count(p => p.Done);
+            totalFiles = FakeCount;
+            queued = FakeCount - done - rows.Count;
+            speed = rows.Sum(r => r.SpeedBps) / 1024 / 1024;
+            totalBytes = fakePatches.Sum(p => p.Length);
+            downloadedBytes = fakePatches.Sum(p => p.Downloaded);
+        }
+        else
+        {
+            rows = LoginService.ProgressSnapshot(patcher);
+            done = patcher?.Downloads.Count(d => d.State == PatchState.Finished) ?? 0;
+            totalFiles = patcher?.Downloads.Count ?? 0;
+            queued = rows.Count(r => r.State == "queued");
+            speed = rows.Sum(r => r.SpeedBps) / 1024 / 1024;
+            totalBytes = patcher is null ? 0 : patcher.Downloads.Sum(d => d.Patch.Length);
+            downloadedBytes = (patcher?.Downloads.Where(d => d.State == PatchState.Finished).Sum(d => d.Patch.Length) ?? 0)
+                              + rows.Where(r => r.State != "queued").Sum(r => r.Downloaded);
+        }
 
-        var done = patcher?.Downloads.Count(d => d.State == PatchState.Finished) ?? 0;
-        var totalPatches = patcher?.Downloads.Count ?? 0;
-        var speed = rows.Sum(r => r.SpeedBps) / 1024 / 1024;
+        // All patches done — nothing left to show; close the popup (the login
+        // pipeline also closes it on install completion; double close is safe).
+        if (totalFiles > 0 && done == totalFiles)
+        {
+            Log.Information("All {Total} downloads complete — closing progress popup", totalFiles);
+            CloseProgressPopup();
+            return;
+        }
 
-        progressSummary.Text = $"{done}/{totalPatches} downloaded · {speed:0.0} MB/s";
+        // File bars: min 0, max 4. 1-3 downloading files show that many bars, 4+ show 4.
+        var activeBars = rows.Where(r => r.State != "queued").Take(4).ToList();
+
+        progressSummary.Text = $"{done}/{totalFiles} downloaded · {queued} queued · {speed:0.0} MB/s";
+
+        if (fakePatches is not null)
+            Log.Information("Fake tick: bars={Bars} done={Done} queued={Queued} bytes={Bytes}/{Total}",
+                activeBars.Count, done, queued, downloadedBytes, totalBytes);
 
         progressPanel.Children.Clear();
-        foreach (var r in rows)
+
+        // Overall bar (longest): spans every patch, finished included.
+        progressPanel.Children.Add(new TextBlock
         {
-            var label = r.State switch
-            {
-                "queued" => $"{r.VersionId} — queued ({FmtBytes(r.Total)})",
-                "verifying" => $"{r.VersionId} — verifying SHA1 {FmtBytes(r.Downloaded)}/{FmtBytes(r.Total)}",
-                _ => $"{r.VersionId} — {FmtBytes(r.Downloaded)}/{FmtBytes(r.Total)} at {r.SpeedBps / 1024 / 1024:0.0} MB/s",
-            };
+            Text = "Overall",
+            Margin = new Thickness(0, 2, 0, 0),
+        });
+        progressPanel.Children.Add(new ProgressBar
+        {
+            Minimum = 0,
+            Maximum = Math.Max(1, totalBytes),
+            Value = downloadedBytes,
+            Height = 14,
+            Width = 528,
+            Margin = new Thickness(0, 2, 0, 8),
+        });
+
+        foreach (var r in activeBars)
+        {
+            var label = r.State == "verifying"
+                ? $"{r.VersionId} — verifying SHA1 {FmtBytes(r.Downloaded)}/{FmtBytes(r.Total)}"
+                : $"{r.VersionId} — {FmtBytes(r.Downloaded)}/{FmtBytes(r.Total)} at {r.SpeedBps / 1024 / 1024:0.0} MB/s";
             progressPanel.Children.Add(new TextBlock
             {
                 Text = label,
@@ -795,6 +870,7 @@ public partial class MainWindow : Window
                 Maximum = Math.Max(1, r.Total),
                 Value = r.Downloaded,
                 Height = 8,
+                Width = 400,
                 Margin = new Thickness(0, 2, 0, 2),
             });
         }
@@ -808,6 +884,70 @@ public partial class MainWindow : Window
         progressWindow = null;
         progressPanel = null;
         progressSummary = null;
+    }
+
+    // ---------- fake download test (XIVON_FAKE_DOWNLOADS=1, no network) ----------
+
+    private static double SlotSpeed(int slot) => (2.0 + slot) * 5 * 1024 * 1024;
+
+    /// <summary>Advance each of the 4 fake slots: the patch at fakeSlotIdx[s] gains
+    /// SlotSpeed(s) bytes per tick; a full patch verifies for 2 ticks, then the slot
+    /// moves to the next patch in its interleaved queue (s, s+4, s+8, ...).</summary>
+    private void AdvanceFakeProgress()
+    {
+        for (var s = 0; s < 4; s++)
+        {
+            var idx = fakeSlotIdx[s];
+            if (idx >= FakeCount)
+                continue;
+            var p = fakePatches![idx];
+            if (p.VerifyTicks > 0)
+            {
+                p.VerifyTicks--;
+                if (p.VerifyTicks == 0)
+                {
+                    p.Done = true;
+                    fakeSlotIdx[s] += 4;
+                }
+                continue;
+            }
+            p.Downloaded = Math.Min(p.Length, p.Downloaded + (long)SlotSpeed(s));
+            if (p.Downloaded >= p.Length)
+                p.VerifyTicks = 2;
+        }
+    }
+
+    private List<LoginService.DownloadSlotInfo> FakeRows()
+    {
+        var rows = new List<LoginService.DownloadSlotInfo>();
+        for (var s = 0; s < 4; s++)
+        {
+            var idx = fakeSlotIdx[s];
+            if (idx >= FakeCount)
+                continue;
+            var p = fakePatches![idx];
+            rows.Add(new LoginService.DownloadSlotInfo
+            {
+                VersionId = p.VersionId,
+                Total = p.Length,
+                Downloaded = p.Downloaded,
+                SpeedBps = p.VerifyTicks > 0 ? 0 : SlotSpeed(s),
+                State = p.VerifyTicks > 0 ? "verifying" : "downloading",
+            });
+        }
+        return rows;
+    }
+
+    /// <summary>Open the popup with 40 fake patches (20-119 MB each) and start the
+    /// 1s tick; progress is simulated entirely in memory, no aria2, no network.</summary>
+    private void OpenFakeProgressPopup()
+    {
+        fakePatches = new List<FakePatch>();
+        for (var i = 0; i < FakeCount; i++)
+            fakePatches.Add(new FakePatch { VersionId = $"fake-{i:D2}", Length = (20 + i * 37 % 100) * 1024 * 1024 });
+        fakeSlotIdx = new int[] { 0, 1, 2, 3 };
+        OpenProgressPopup("Installing game patches (fake test)");
+        Log.Information("Fake download test mode: {Count} fake patches, 4 slots", FakeCount);
     }
 
     private static string FmtBytes(long bytes)
