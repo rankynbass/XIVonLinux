@@ -22,6 +22,12 @@ public sealed class LaunchSettings
     public string ConfigPath { get; set; } = "";      // character data folder (ffxivConfig)
     public string PatchPath { get; set; } = "";       // downloaded patches folder
     public string Language { get; set; } = "English"; // game client language: Japanese/English/German/French
+    public string AdditionalArgs { get; set; } = "";  // extra key=value game args (XIVLauncher.Core AdditionalArgs)
+    public string DpiAwareness { get; set; } = "Unaware"; // DpiAwareness name: Aware/Unaware
+    public bool IgnoreSteam { get; set; }             // never use Steam service-account flags at launch
+    public bool UseXlAuthMacros { get; set; }         // XL auth macros (IsOtpServer parity; no server on Linux, UI parity)
+    public bool UseUidCache { get; set; }             // enable the uid cache (XIVLauncher.Core cache is a stub; parity UI)
+    public string UidCache { get; set; } = "";        // cached uid string; Reset button clears it
 
     // Proton tab
     public string ProtonPath { get; set; } = "";
@@ -98,6 +104,12 @@ public sealed class SettingsService
         sb.AppendLine($"config_path = {TomlString(this.Settings.ConfigPath)}");
         sb.AppendLine($"patch_path = {TomlString(this.Settings.PatchPath)}");
         sb.AppendLine($"language = {TomlString(this.Settings.Language)}");
+        sb.AppendLine($"additional_args = {TomlString(this.Settings.AdditionalArgs)}");
+        sb.AppendLine($"dpi_awareness = {TomlString(this.Settings.DpiAwareness)}");
+        sb.AppendLine($"ignore_steam = {this.Settings.IgnoreSteam.ToString().ToLowerInvariant()}");
+        sb.AppendLine($"uid_cache = {TomlString(this.Settings.UidCache)}");
+        sb.AppendLine($"use_uid_cache = {this.Settings.UseUidCache.ToString().ToLowerInvariant()}");
+        sb.AppendLine($"use_xl_auth_macros = {this.Settings.UseXlAuthMacros.ToString().ToLowerInvariant()}");
         sb.AppendLine();
 
         sb.AppendLine("[proton]");
@@ -196,6 +208,12 @@ public sealed class SettingsService
         if (Get(game, "config_path", "config_path") is string cp) s.ConfigPath = cp;
         if (Get(game, "patch_path", "patch_folder") is string pp) s.PatchPath = pp;
         if (Get(game, "language", "language") is string lg) s.Language = lg;
+        if (Get(game, "additional_args", "additional_args") is string aa) s.AdditionalArgs = aa;
+        if (Get(game, "dpi_awareness", "dpi_awareness") is string da) s.DpiAwareness = da;
+        s.IgnoreSteam = GetBool(game, "ignore_steam", "ignore_steam", s.IgnoreSteam);
+        if (Get(game, "uid_cache", "uid_cache") is string uc) s.UidCache = uc;
+        s.UseUidCache = GetBool(game, "use_uid_cache", "use_uid_cache", s.UseUidCache);
+        s.UseXlAuthMacros = GetBool(game, "use_xl_auth_macros", "use_xl_auth_macros", s.UseXlAuthMacros);
 
         if (Get(proton, "proton_path", "proton_path") is string pt) s.ProtonPath = pt;
         if (Get(proton, "prefix_path", "prefix_path") is string px) s.PrefixPath = px;

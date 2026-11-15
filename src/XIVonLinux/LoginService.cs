@@ -432,7 +432,7 @@ public sealed class LoginService : IDisposable
     /// its config to, translated to a Wine-style prefix path. Same shape as
     /// Launcher.LaunchGame's internal ArgumentBuilder + upstream UserPath append.
     /// </summary>
-    public string BuildEncryptedGameArgs(Launcher.LoginResult loginResult, DirectoryInfo gamePath, DirectoryInfo gameConfigPath, bool isSteamServiceAccount)
+    public string BuildEncryptedGameArgs(Launcher.LoginResult loginResult, DirectoryInfo gamePath, DirectoryInfo gameConfigPath, bool isSteamServiceAccount, string additionalArgs = "")
     {
         var builder = new ArgumentBuilder()
             .Append("DEV.DataPathType", "1")
@@ -449,6 +449,15 @@ public sealed class LoginService : IDisposable
         // account, which fails FT accounts with error 3109 "not registered").
         if (isSteamServiceAccount)
             builder.Append("IsSteam", "1");
+
+        // XIVLauncher.Core parity: extra key=value args, split by the same regex Launcher.LaunchGame uses.
+        if (!string.IsNullOrWhiteSpace(additionalArgs))
+        {
+            var regex = new System.Text.RegularExpressions.Regex(@"\s*(?<key>[^\s=]+)\s*=\s*(?<value>([^=]*$|[^=]*\s(?=[^\s=]+)))\s*",
+                System.Text.RegularExpressions.RegexOptions.Compiled);
+            foreach (System.Text.RegularExpressions.Match match in regex.Matches(additionalArgs))
+                builder.Append(match.Groups["key"].Value, match.Groups["value"].Value.Trim());
+        }
 
         var userPath = prefix.UnixToWinePath(gameConfigPath.FullName);
         builder.Append("UserPath", userPath);

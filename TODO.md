@@ -18,6 +18,8 @@ Changes and additions to Settings window
 ### Game
 * Add search feature to find the game. Search paths ~/.xlcore/ffxiv, ~/.local/share/Steam/steamapps/common, ~/Games. Allow the user to pick one if multiple are found. Priority: Low
 * Add features from XIVLauncher.Core Settings->Game tab. Priority: Medium
+* Add UID cache function. Priority: Low
+* Add Auto-login macro. Priority: Low
 
 ### Patching
 * Move patching to its own tab. Priority: Low

@@ -940,13 +940,14 @@ public partial class MainWindow : Window
                 }
 
                 Report($"Install complete: game ver {Repository.Ffxiv.GetVer(gamePath)}");
+                var launchSteam1 = s.SteamAccount && !s.IgnoreSteam;   // XIVLauncher.Core IsIgnoringSteam
                 if (withDalamud)
                 {
                     if (!await WaitForDalamudAsync()) return;
-                    LaunchWithDansharing(prefix, service, gameExe, gamePath, installResult, lang, s.SteamAccount);
+                    LaunchWithDansharing(prefix, service, gameExe, gamePath, installResult, lang, launchSteam1);
                 }
                 else
-                    LaunchPlain(prefix, service, gamePath, installResult, lang, s.SteamAccount);
+                    LaunchPlain(prefix, service, gamePath, installResult, lang, launchSteam1);
                 return;
             }
 
@@ -988,13 +989,14 @@ public partial class MainWindow : Window
                     break;
             }
 
+            var launchSteam = s.SteamAccount && !s.IgnoreSteam;   // XIVLauncher.Core IsIgnoringSteam
             if (withDalamud)
             {
                 if (!await WaitForDalamudAsync()) return;
-                LaunchWithDansharing(prefix, service, gameExe, gamePath, result, lang, s.SteamAccount);
+                LaunchWithDansharing(prefix, service, gameExe, gamePath, result, lang, launchSteam);
             }
             else
-                LaunchPlain(prefix, service, gamePath, result, lang, s.SteamAccount);
+                LaunchPlain(prefix, service, gamePath, result, lang, launchSteam);
         }
         catch (Exception ex)
         {
@@ -1019,11 +1021,16 @@ public partial class MainWindow : Window
         var gameRunner = new LinuxGameRunner(prefix, this.umuRunPath);
         var game = new XivGame(new LinuxSteamStub(), new NullUniqueIdCache(), this.frontierUrl, "en");
 
+        var gs = this.settingsService.Settings;
         var userPathWine = prefix.UnixToWinePath(service.GameConfigFolder().FullName);
+        var extraArgs = $" UserPath={userPathWine}";
+        if (!string.IsNullOrWhiteSpace(gs.AdditionalArgs))
+            extraArgs += " " + gs.AdditionalArgs;   // regex-split by Launcher.LaunchGame
+        var dpi = Enum.TryParse<DpiAwareness>(gs.DpiAwareness, out var d) ? d : DpiAwareness.Unaware;
         Report("LaunchGame (login session, encrypted args)");
         var proc = game.LaunchGame(gameRunner, result.UniqueId ?? string.Empty, result.OauthLogin!.Region,
-            result.OauthLogin.MaxExpansion, isSteam, $" UserPath={userPathWine}", "",
-            gamePath, lang, true, DpiAwareness.Unaware);
+            result.OauthLogin.MaxExpansion, isSteam, extraArgs, "",
+            gamePath, lang, true, dpi);
 
         if (proc is not null)
         {
@@ -1131,7 +1138,7 @@ public partial class MainWindow : Window
             envPairs.Add(("IS_FFXIV_LAUNCH_FROM_STEAM", "1"));
         var env = new UmuInPrefixEnvironment(prefix).Build(envPairs.ToArray());
 
-        var gameArgs = service.BuildEncryptedGameArgs(result, gamePath, service.GameConfigFolder(), isSteam);
+        var gameArgs = service.BuildEncryptedGameArgs(result, gamePath, service.GameConfigFolder(), isSteam, this.settingsService.Settings.AdditionalArgs);
 
         Interlocked.Increment(ref activeLaunches);
         var loadMethod = this.settingsService.Settings.LoadMethod switch

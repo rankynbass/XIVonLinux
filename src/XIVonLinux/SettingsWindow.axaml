@@ -4,8 +4,10 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Width="640"
     Height="460"
+    MinWidth="480"
+    MinHeight="360"
     Title="Settings"
-    CanResize="False">
+    CanResize="True">
     <DockPanel Margin="20">
 
         <!-- Save at lower right -->
@@ -14,10 +16,13 @@
             <Button Content="Save" Name="SaveButton" Click="OnSave" MinWidth="96" />
         </StackPanel>
 
-        <TabControl>
+        <!-- Resizable window with scrolling content: tall tabs (Game, Proton) scroll
+             vertically; the Save row stays docked at the bottom. -->
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <TabControl>
 
             <TabItem Header="Game">
-                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,12,0,0">
+                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,12,0,0">
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="GamePath" VerticalAlignment="Center" Margin="0,0,12,6" />
                     <TextBox Grid.Row="0" Grid.Column="1" Name="GamePathBox" Margin="0,0,8,6" />
                     <Button Grid.Row="0" Grid.Column="2" Content="Browse" Name="GameBrowseButton" Click="OnBrowseGame" Margin="0,0,0,6" />
@@ -30,8 +35,33 @@
                     <TextBox Grid.Row="2" Grid.Column="1" Name="PatchPathBox" Margin="0,0,8,6" />
                     <Button Grid.Row="2" Grid.Column="2" Content="Browse" Name="PatchBrowseButton" Click="OnBrowsePatch" Margin="0,0,0,6" />
 
-                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Language" VerticalAlignment="Center" Margin="0,0,12,0" />
-                    <ComboBox Grid.Row="3" Grid.Column="1" Name="LanguageCombo" Margin="0,0,0,0" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Language" VerticalAlignment="Center" Margin="0,0,12,6" />
+                    <ComboBox Grid.Row="3" Grid.Column="1" Name="LanguageCombo" Margin="0,0,0,6" />
+
+                    <!-- XIVLauncher.Core parity: extra key=value game args, DPI awareness,
+                         Steam-ignore, XL auth macros, uid cache. -->
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Args" VerticalAlignment="Center" Margin="0,0,12,6" />
+                    <TextBox Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Name="AdditionalArgsBox" Margin="0,0,0,6"
+                             Watermark="Extra game arguments (key=value pairs)" />
+
+                    <TextBlock Grid.Row="5" Grid.Column="0" Text="DPI" VerticalAlignment="Center" Margin="0,0,12,6" />
+                    <ComboBox Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2" Name="DpiCombo" Margin="0,0,0,6" />
+
+                    <CheckBox Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="3" Content="Ignore Steam (never launch via Steam service account)"
+                              Name="IgnoreSteamCheck" HorizontalAlignment="Left" Margin="0,0,0,6" />
+
+                    <CheckBox Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="3" Content="Use XL auth macros"
+                              Name="XlAuthCheck" HorizontalAlignment="Left" Margin="0,0,0,6" IsVisible="False" />
+
+                    <CheckBox Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="3" Content="Use UID cache"
+                              Name="UidCacheCheck" HorizontalAlignment="Left" Margin="0,0,0,6"
+                              IsCheckedChanged="OnUidCacheToggled" IsVisible="False" />
+
+                    <StackPanel Grid.Row="9" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="10"
+                                Name="UidCachePanel" IsVisible="False" Margin="0,0,0,6">
+                        <TextBlock Text="Reset the uid cache; you must then restart the launcher." VerticalAlignment="Center" />
+                        <Button Content="Reset UID Cache" Name="ResetUidCacheButton" Click="OnResetUidCache" />
+                    </StackPanel>
                 </Grid>
             </TabItem>
 
@@ -98,5 +128,6 @@
             </TabItem>
 
         </TabControl>
+        </ScrollViewer>
     </DockPanel>
 </Window>

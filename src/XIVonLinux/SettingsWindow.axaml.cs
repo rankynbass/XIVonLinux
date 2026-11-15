@@ -52,6 +52,19 @@ public partial class SettingsWindow : Window
         LanguageCombo.SelectedItem = s.Language;
         if (LanguageCombo.SelectedItem is null)
             LanguageCombo.SelectedIndex = 0;
+
+        // XIVLauncher.Core Game tab parity: extra args, DPI awareness, Steam-ignore,
+        // XL auth macros, uid cache toggle + reset panel.
+        AdditionalArgsBox.Text = s.AdditionalArgs;
+        DpiCombo.Items.Add("Aware");
+        DpiCombo.Items.Add("Unaware");
+        DpiCombo.SelectedItem = s.DpiAwareness;
+        if (DpiCombo.SelectedItem is null)
+            DpiCombo.SelectedIndex = 1;   // Unaware default
+        IgnoreSteamCheck.IsChecked = s.IgnoreSteam;
+        XlAuthCheck.IsChecked = s.UseXlAuthMacros;
+        UidCacheCheck.IsChecked = s.UseUidCache;
+        UidCachePanel.IsVisible = false;   // UID cache UI hidden until implemented
         DalamudCheck.IsChecked = s.DalamudEnabled;
 
         // Dalamud tab (XIVLauncher.Core parity): load method, branch, injection delay,
@@ -272,6 +285,23 @@ public partial class SettingsWindow : Window
     private async void OnBrowseManualInject(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => await PickFolderAsync(ManualInjectPathBox);
 
+    /// <summary>UID cache panel shows only while the cache toggle is on (XIVLauncher.Core footer).</summary>
+    private void OnUidCacheToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        UidCachePanel.IsVisible = UidCacheCheck.IsChecked == true;
+    }
+
+    /// <summary>Clears the cached uid and persists; the launcher must restart to take effect
+    /// (XIVLauncher.Core: "you must then restart the launcher").</summary>
+    private void OnResetUidCache(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (this.settingsService is null)
+            return;
+        this.settingsService.Settings.UidCache = "";
+        this.settingsService.Save();
+        ShowAlert("UID cache cleared. Restart the launcher to take effect.");
+    }
+
     /// <summary>Modal alert on this window; OK closes it.</summary>
     private void ShowAlert(string message)
     {
@@ -303,6 +333,22 @@ public partial class SettingsWindow : Window
         s.ConfigPath = ConfigPathBox.Text;
         s.PatchPath = PatchPathBox.Text;
         s.Language = LanguageCombo.SelectedItem as string ?? "English";
+
+        // XIVLauncher.Core CheckValidity: game folder must be set, and must not be the
+        // game/ or boot/ subfolder of an FFXIV install (the common mispick).
+        var gameName = Path.GetFileName(s.GamePath.TrimEnd('/', '\\'));
+        if (string.IsNullOrEmpty(s.GamePath) || gameName == "game" || gameName == "boot")
+        {
+            ShowAlert("GamePath is invalid — pick the FFXIV install folder (the one containing\n" +
+                      "the game/ and boot/ subfolders), not game/ or boot/ itself.");
+            return;
+        }
+
+        s.AdditionalArgs = AdditionalArgsBox.Text;
+        s.DpiAwareness = DpiCombo.SelectedItem as string ?? "Unaware";
+        s.IgnoreSteam = IgnoreSteamCheck.IsChecked == true;
+        s.UseXlAuthMacros = XlAuthCheck.IsChecked == true;
+        s.UseUidCache = UidCacheCheck.IsChecked == true;
         s.ManagedProton = ManagedProtonCheck.IsChecked == true;
         if (s.ManagedProton && ProtonCombo.SelectedItem is string pick)
             s.ProtonPath = pick;   // managed mode: the enumerated selection wins
