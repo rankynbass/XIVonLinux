@@ -9,4 +9,10 @@
     <Project Path="src/XIVonLinux/XIVonLinux.csproj" />
     <Project Path="src/XIVLauncher.Common.Linux/XIVLauncher.Common.Linux.csproj" />
   </Folder>
+  <Project Path="../XIVLauncher.Core/lib/FFXIVQuickLauncher/src/XIVLauncher.Aria/XIVLauncher.Aria.csproj" />
+  <Project Path="../XIVLauncher.Core/lib/FFXIVQuickLauncher/src/XIVLauncher.Common.Windows/XIVLauncher.Common.Windows.csproj" />
+  <Project Path="../XIVLauncher.Core/lib/FFXIVQuickLauncher/src/XIVLauncher.Common/XIVLauncher.Common.csproj" />
+  <Project Path="../XIVLauncher.Core/src/XIVLauncher.Common.Unix/XIVLauncher.Common.Unix.csproj" />
+  <Project Path="../XIVLauncher.Core/src/XIVLauncher.Core/XIVLauncher.Core.csproj" />
+  <Project Path="../XIVLauncher.Core/src/XIVLauncher.VersionGenerator/XIVLauncher.VersionGenerator.csproj" />
 </Solution>
