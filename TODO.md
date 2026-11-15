@@ -46,7 +46,7 @@ Changes to the main page
 * [DONE 2026-11-14 17:44 PT] Add backends for saving passwords. File/Keychain. Examples in XIVLauncher.Core. Use Simple AED encrypt/decrypt to obfuscate passwords in file. Should also be a sqlite database. Priority: Medium
 
 ### UI fixes
-* Move the Settings/Show logs buttons to the right. So the news frame should be on the left side, with the login on upper right, and settings/log buttons on bottom right. This should allow the whole news frame to show without scroll bar by default. Priority: Medium
+* [DONE 2026-11-14 20:55 PT via 554a9cc] Move the Settings/Show logs buttons to the right. So the news frame should be on the left side, with the login on upper right, and settings/log buttons on bottom right. This should allow the whole news frame to show without scroll bar by default. Priority: Medium
 * Fix the download popup. It should always show at least one bar as long as something is downloading. Make 5 bars: The first bar should be the longest, and an overall progress bar. The remaining bars should be for downloading files, min 0 (if nothing downloading), max 4. If there are between 1 and 3 files still downloading, show that many download bars. If 4 or more, show 4. Priority: Low
 
 ## Obey XDG spec
