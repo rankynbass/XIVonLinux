@@ -9,61 +9,65 @@
     Title="XIVonLinux">
     <DockPanel Margin="20">
 
-        <!-- Button bar: two left-aligned action buttons, full width -->
-        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="12" Margin="0,12,0,0">
-            <Button Content="Settings" Name="SettingsButton" Click="OnSettings" />
-            <Button Content="Show log" Name="LogToggleButton" Click="OnToggleLog" />
-        </StackPanel>
-
-        <!-- Left panel swaps between news (default) and the log box; the login side
-             (username/password/OTP/login) is never hidden -->
-        <!-- News frame has the lowest layout priority: the login column keeps its width
-             (Auto), the news column takes the rest and shrinks first; its content scrolls. -->
-        <Grid ColumnDefinitions="*,Auto" RowDefinitions="*">
-
-            <Grid Grid.Row="0" Grid.Column="0" MinWidth="180" Margin="0,0,12,0">
-                <!-- A. News banner + headlines: visible while the log is hidden -->
-                <Border Name="NewsPanel"
-                        BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" CornerRadius="4">
-                    <DockPanel>
-                        <!-- Banner section: fixed slot that shrinks with the column width
-                             (max 640x250, left-aligned); it never scrolls -->
-                        <StackPanel DockPanel.Dock="Top" Margin="12,12,12,8" Spacing="8">
-                            <TextBlock Name="NewsLoadingText" Text="Loading news..." />
-                            <Image Name="BannerImage" IsVisible="False" MaxWidth="640" MaxHeight="250"
-                                   HorizontalAlignment="Left" Stretch="Uniform" />
-                        </StackPanel>
-
-                        <!-- Headlines section: scrolls vertically when the frame shrinks -->
-                        <ScrollViewer Name="NewsScroll" HorizontalScrollBarVisibility="Disabled"
-                                      VerticalScrollBarVisibility="Visible">
-                            <StackPanel Name="NewsList" Margin="12,0,12,12" Spacing="4" />
-                        </ScrollViewer>
-                    </DockPanel>
-                </Border>
-
-                <!-- Log box: replaces the news area when shown -->
-                <TextBox Name="StatusLog" IsVisible="False"
-                         IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" />
-            </Grid>
-
-            <!-- B. Login section: scrolls when the window is shrunk vertically -->
-            <ScrollViewer Grid.Row="0" Grid.Column="1" VerticalScrollBarVisibility="Visible"
-                          HorizontalScrollBarVisibility="Disabled">
-                <StackPanel MinWidth="200" Spacing="6">
-                    <TextBlock Text="Username" Margin="0,0,0,2" />
-                    <TextBox Name="UsernameBox" />
-                    <TextBlock Text="Password" Margin="0,8,0,2" />
-                    <TextBox Name="PasswordBox" PasswordChar="*" />
-                    <CheckBox Content="OTP" Name="OtpCheck" Margin="0,12,0,0" />
-                    <CheckBox Content="Steam account" Name="SteamAccountCheck" Margin="0,12,0,0" />
-                    <CheckBox Content="Free trial" Name="FreeTrialCheck" Margin="0,2,0,0" />
-                    <CheckBox Content="Save password" Name="SavePasswordCheck" Margin="0,2,0,0" />
-                    <Button Content="Login" Name="LoginButton" Click="OnLogin" Margin="0,12,0,0" />
-                    <Button Content="Accounts" Name="AccountsButton" Margin="0,8,0,0" />
+        <!-- Right side: one docked column split vertically into the login frame (top,
+             fills) and the buttons frame (bottom). Docking the whole column to the right
+             keeps the news frame full-height on the left. -->
+        <Grid DockPanel.Dock="Right" RowDefinitions="*,Auto" MinWidth="200" Margin="12,0,0,0">
+            <Border Grid.Row="0"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" CornerRadius="4"
+                    Padding="10">
+                <ScrollViewer VerticalScrollBarVisibility="Visible"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Username" Margin="0,0,0,2" />
+                        <TextBox Name="UsernameBox" />
+                        <TextBlock Text="Password" Margin="0,8,0,2" />
+                        <TextBox Name="PasswordBox" PasswordChar="*" />
+                        <CheckBox Content="OTP" Name="OtpCheck" Margin="0,12,0,0" />
+                        <CheckBox Content="Steam account" Name="SteamAccountCheck" Margin="0,12,0,0" />
+                        <CheckBox Content="Free trial" Name="FreeTrialCheck" Margin="0,2,0,0" />
+                        <CheckBox Content="Save password" Name="SavePasswordCheck" Margin="0,2,0,0" />
+                        <Button Content="Login" Name="LoginButton" Click="OnLogin" Margin="0,12,0,0" />
+                        <Button Content="Accounts" Name="AccountsButton" Margin="0,8,0,0" />
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+            <Border Grid.Row="1" Margin="0,8,0,0"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" CornerRadius="4"
+                    Padding="6,8">
+                <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+                    <Button Content="Settings" Name="SettingsButton" Click="OnSettings" />
+                    <Button Content="Show log" Name="LogToggleButton" Click="OnToggleLog" />
                 </StackPanel>
-            </ScrollViewer>
+            </Border>
+        </Grid>
 
+        <!-- News frame fills the remaining width (news shown while the log is hidden,
+             log box replaces it when shown); headlines scroll when the frame shrinks. -->
+        <Grid MinWidth="180" Margin="0,0,12,0">
+            <!-- A. News banner + headlines: visible while the log is hidden -->
+            <Border Name="NewsPanel"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" CornerRadius="4">
+                <DockPanel>
+                    <!-- Banner section: fixed slot that shrinks with the column width
+                         (max 640x250, left-aligned); it never scrolls -->
+                    <StackPanel DockPanel.Dock="Top" Margin="12,0,12,8" Spacing="8">
+                        <TextBlock Name="NewsLoadingText" Text="Loading news..." />
+                        <Image Name="BannerImage" IsVisible="False" MaxWidth="640" MaxHeight="250"
+                               HorizontalAlignment="Left" Stretch="Uniform" />
+                    </StackPanel>
+
+                    <!-- Headlines section: scrollbar appears only when headlines overflow -->
+                    <ScrollViewer Name="NewsScroll" HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto">
+                        <StackPanel Name="NewsList" Margin="12,0,12,12" Spacing="4" />
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <!-- Log box: replaces the news area when shown -->
+            <TextBox Name="StatusLog" IsVisible="False"
+                     IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" />
         </Grid>
     </DockPanel>
 </Window>

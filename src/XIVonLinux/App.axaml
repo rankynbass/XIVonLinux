@@ -5,5 +5,12 @@
     RequestedThemeVariant="Dark">
     <Application.Styles>
         <FluentTheme />
+        <!-- Launcher-wide default font: embedded Noto Sans CJK JP. FontFamily is an
+             inherited property, so every control under a Window draws with it. -->
+        <Style Selector="Window">
+            <Style.Setters>
+                <Setter Property="FontFamily" Value="avares://XIVonLinux/Resources/fonts/NotoSansCJKjp-Regular.otf#Noto Sans CJK JP" />
+            </Style.Setters>
+        </Style>
     </Application.Styles>
 </Application>

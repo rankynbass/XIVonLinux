@@ -18,6 +18,12 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <!-- Launcher font: embedded Noto Sans CJK JP (copied from XIVLauncher.Core Resources),
+             served to Avalonia via avares:// under the family name in its name table. -->
+        <AvaloniaResource Include="Resources/fonts/NotoSansCJKjp-Regular.otf" />
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="..\XIVLauncher.Common.Linux\XIVLauncher.Common.Linux.csproj" />
         <ProjectReference Include="..\XIVLauncher.VersionGenerator\XIVLauncher.VersionGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     </ItemGroup>

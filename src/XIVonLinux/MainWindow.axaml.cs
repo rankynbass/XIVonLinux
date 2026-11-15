@@ -449,7 +449,13 @@ public partial class MainWindow : Window
 
     private void AddNewsEntry(string title, string url)
     {
-        var tb = new TextBlock { Text = title, TextWrapping = TextWrapping.Wrap, Cursor = new Cursor(StandardCursorType.Hand) };
+        // News/Topics entries draw 1pt below the inherited default (12 -> 11), and
+        // highlight with the theme accent on mouseover (cleared on exit, falling
+        // back to the inherited Foreground).
+        var tb = new TextBlock { Text = title, FontSize = 11, TextWrapping = TextWrapping.Wrap, Cursor = new Cursor(StandardCursorType.Hand) };
+        var accent = new SolidColorBrush((Color)Avalonia.Application.Current.FindResource("SystemAccentColor"));
+        tb.PointerEntered += (_, _) => tb.Foreground = accent;
+        tb.PointerExited += (_, _) => tb.ClearValue(TextBlock.ForegroundProperty);
         tb.PointerPressed += (_, _) => OpenUrl(url);
         NewsList.Children.Add(tb);
     }
