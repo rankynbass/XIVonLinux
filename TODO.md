@@ -22,9 +22,9 @@ Changes and additions to Settings window
 * Add Auto-login macro. Priority: Low
 
 ### Patching
-* Move patching to its own tab. Priority: Low
-* Allow user to set limit on download speed. Priority: Low
-* Allow user to set maximum number of connections. Priority: Low
+* [DONE 2026-11-15 08:30 PT via e6edabe] Move patching to its own tab. Priority: Low
+* [DONE 2026-11-15 08:30 PT via e6edabe] Allow user to set limit on download speed. Priority: Low
+* [DONE 2026-11-15 08:30 PT via e6edabe] Allow user to set maximum number of connections. Priority: Low
 
 ### Proton
 * [DONE 2026-11-14 15:00 PT] Have a toggle for Custom proton or Managed proton. Priority: High
