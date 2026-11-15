@@ -95,31 +95,31 @@ public partial class DownloadPopup : Window
         {
             AdvanceFakeProgress();
             rows = FakeRows();
-            done = fakePatches.Count(p => p.Done);
+            done = fakePatches.Count(patch => patch.Done);
             totalFiles = FakeCount;
             queued = FakeCount - done - rows.Count;
-            speed = rows.Where(r => r.State == "downloading").Sum(r => r.SpeedBps) / 1024 / 1024;
-            totalBytes = fakePatches.Sum(p => p.Length);
-            downloadedBytes = fakePatches.Sum(p => p.Downloaded);
-            installedBytes = fakePatches.Where(p => p.Done).Sum(p => p.Length);
-            installActive = rows.Count(r => r.State == "installing");
+            speed = rows.Where(row => row.State == "downloading").Sum(row => row.SpeedBps) / 1024 / 1024;
+            totalBytes = fakePatches.Sum(patch => patch.Length);
+            downloadedBytes = fakePatches.Sum(patch => patch.Downloaded);
+            installedBytes = fakePatches.Where(patch => patch.Done).Sum(patch => patch.Length);
+            installActive = rows.Count(row => row.State == "installing");
         }
         else
         {
             rows = LoginService.ProgressSnapshot(patcher);
-            done = patcher?.Downloads.Count(d => d.State == PatchState.Finished) ?? 0;
+            done = patcher?.Downloads.Count(download => download.State == PatchState.Finished) ?? 0;
             totalFiles = patcher?.Downloads.Count ?? 0;
-            queued = rows.Count(r => r.State == "queued");
-            speed = rows.Where(r => r.State == "downloading").Sum(r => r.SpeedBps) / 1024 / 1024;
-            totalBytes = patcher is null ? 0 : patcher.Downloads.Sum(d => d.Patch.Length);
+            queued = rows.Count(row => row.State == "queued");
+            speed = rows.Where(row => row.State == "downloading").Sum(row => row.SpeedBps) / 1024 / 1024;
+            totalBytes = patcher is null ? 0 : patcher.Downloads.Sum(download => download.Patch.Length);
             // Download phase bytes: fully verified (Downloaded/IsInstalling/Finished)
             // plus live slot bytes for in-flight downloading/verifying rows.
-            downloadedBytes = (patcher?.Downloads.Where(d => d.State == PatchState.Downloaded
-                                                          || d.State == PatchState.IsInstalling
-                                                          || d.State == PatchState.Finished).Sum(d => d.Patch.Length) ?? 0)
-                              + rows.Where(r => r.State == "downloading" || r.State == "verifying").Sum(r => r.Downloaded);
-            installedBytes = patcher?.Downloads.Where(d => d.State == PatchState.Finished).Sum(d => d.Patch.Length) ?? 0;
-            installActive = rows.Count(r => r.State == "installing");
+            downloadedBytes = (patcher?.Downloads.Where(download => download.State == PatchState.Downloaded
+                                                          || download.State == PatchState.IsInstalling
+                                                          || download.State == PatchState.Finished).Sum(download => download.Patch.Length) ?? 0)
+                              + rows.Where(row => row.State == "downloading" || row.State == "verifying").Sum(row => row.Downloaded);
+            installedBytes = patcher?.Downloads.Where(download => download.State == PatchState.Finished).Sum(download => download.Patch.Length) ?? 0;
+            installActive = rows.Count(row => row.State == "installing");
         }
 
         // All patches done — nothing left to show; close the popup (the login
@@ -132,7 +132,7 @@ public partial class DownloadPopup : Window
         }
 
         // File bars: min 0, max 4. 1-3 downloading files show that many bars, 4+ show 4.
-        var activeBars = rows.Where(r => r.State != "queued").Take(4).ToList();
+        var activeBars = rows.Where(row => row.State != "queued").Take(4).ToList();
 
         SummaryText.Text = $"{done}/{totalFiles} complete · {queued} queued · {speed:0.0} MB/s · install {done}/{totalFiles}";
 
@@ -160,13 +160,13 @@ public partial class DownloadPopup : Window
             Margin = new Thickness(0, 2, 0, 8),
         });
 
-        foreach (var r in activeBars)
+        foreach (var row in activeBars)
         {
-            var label = r.State == "installing"
-                ? $"{r.VersionId} — installing"
-                : r.State == "verifying"
-                ? $"{r.VersionId} — verifying SHA1 {FmtBytes(r.Downloaded)}/{FmtBytes(r.Total)}"
-                : $"{r.VersionId} — {FmtBytes(r.Downloaded)}/{FmtBytes(r.Total)} at {r.SpeedBps / 1024 / 1024:0.0} MB/s";
+            var label = row.State == "installing"
+                ? $"{row.VersionId} — installing"
+                : row.State == "verifying"
+                ? $"{row.VersionId} — verifying SHA1 {FmtBytes(row.Downloaded)}/{FmtBytes(row.Total)}"
+                : $"{row.VersionId} — {FmtBytes(row.Downloaded)}/{FmtBytes(row.Total)} at {row.SpeedBps / 1024 / 1024:0.0} MB/s";
             BarsPanel.Children.Add(new TextBlock
             {
                 Text = label,
@@ -176,13 +176,13 @@ public partial class DownloadPopup : Window
             var bar = new ProgressBar
             {
                 Minimum = 0,
-                Maximum = Math.Max(1, r.Total),
-                Value = r.Downloaded,
+                Maximum = Math.Max(1, row.Total),
+                Value = row.Downloaded,
                 Height = 8,
                 Width = 400,
                 Margin = new Thickness(0, 2, 0, 2),
             };
-            if (r.State == "installing")
+            if (row.State == "installing")
                 bar.IsIndeterminate = true;   // install has no byte progress signal; animate
             BarsPanel.Children.Add(bar);
         }
@@ -202,27 +202,27 @@ public partial class DownloadPopup : Window
             var idx = fakeSlotIdx[s];
             if (idx >= FakeCount)
                 continue;
-            var p = fakePatches[idx];
-            if (p.InstallTicks > 0)
+            var patch = fakePatches[idx];
+            if (patch.InstallTicks > 0)
             {
-                p.InstallTicks--;
-                if (p.InstallTicks == 0)
+                patch.InstallTicks--;
+                if (patch.InstallTicks == 0)
                 {
-                    p.Done = true;
+                    patch.Done = true;
                     fakeSlotIdx[s] += 4;
                 }
                 continue;
             }
-            if (p.VerifyTicks > 0)
+            if (patch.VerifyTicks > 0)
             {
-                p.VerifyTicks--;
-                if (p.VerifyTicks == 0)
-                    p.InstallTicks = 2;
+                patch.VerifyTicks--;
+                if (patch.VerifyTicks == 0)
+                    patch.InstallTicks = 2;
                 continue;
             }
-            p.Downloaded = Math.Min(p.Length, p.Downloaded + (long)SlotSpeed(s));
-            if (p.Downloaded >= p.Length)
-                p.VerifyTicks = 2;
+            patch.Downloaded = Math.Min(patch.Length, patch.Downloaded + (long)SlotSpeed(s));
+            if (patch.Downloaded >= patch.Length)
+                patch.VerifyTicks = 2;
         }
     }
 
@@ -234,14 +234,14 @@ public partial class DownloadPopup : Window
             var idx = fakeSlotIdx[s];
             if (idx >= FakeCount)
                 continue;
-            var p = fakePatches[idx];
+            var patch = fakePatches[idx];
             rows.Add(new LoginService.DownloadSlotInfo
             {
-                VersionId = p.VersionId,
-                Total = p.Length,
-                Downloaded = p.Downloaded,
-                SpeedBps = p.VerifyTicks > 0 ? 0 : p.InstallTicks > 0 ? 0 : SlotSpeed(s),
-                State = p.InstallTicks > 0 ? "installing" : p.VerifyTicks > 0 ? "verifying" : "downloading",
+                VersionId = patch.VersionId,
+                Total = patch.Length,
+                Downloaded = patch.Downloaded,
+                SpeedBps = patch.VerifyTicks > 0 ? 0 : patch.InstallTicks > 0 ? 0 : SlotSpeed(s),
+                State = patch.InstallTicks > 0 ? "installing" : patch.VerifyTicks > 0 ? "verifying" : "downloading",
             });
         }
         return rows;

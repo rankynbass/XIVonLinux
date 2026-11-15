@@ -57,8 +57,8 @@ public sealed class UmuCommandRunner
         bool redirectOutput = false, bool writeLog = false)
     {
         var psi = new ProcessStartInfo(umuRunPath);
-        foreach (var a in args)
-            psi.ArgumentList.Add(a);
+        foreach (var arg in args)
+            psi.ArgumentList.Add(arg);
         return Run(psi, workingDirectory, environment, redirectOutput, writeLog);
     }
 
@@ -104,8 +104,8 @@ public sealed class UmuCommandRunner
     {
         var psi = new ProcessStartInfo(umuRunPath);
         psi.ArgumentList.Add(WinetricksVerb);
-        foreach (var v in verbs)
-            psi.ArgumentList.Add(v);
+        foreach (var verb in verbs)
+            psi.ArgumentList.Add(verb);
         return Run(psi, "", null, false, true);
     }
 
@@ -121,28 +121,28 @@ public sealed class UmuCommandRunner
         if (wineDebug is not null)
             merged["WINEDEBUG"] = wineDebug;
         if (environment is not null)
-            foreach (var kv in environment)
-                merged[kv.Key] = kv.Value;
+            foreach (var entry in environment)
+                merged[entry.Key] = entry.Value;
 
-        foreach (var kv in merged)
-            psi.EnvironmentVariables[kv.Key] = kv.Value;
+        foreach (var entry in merged)
+            psi.EnvironmentVariables[entry.Key] = entry.Value;
 
         if (merged.TryGetValue("STEAM_COMPAT_MOUNTS", out var spawnMounts))
             Log.Information("Spawn env STEAM_COMPAT_MOUNTS: {Mounts}", spawnMounts);
 
         Log.Verbose("umu-run: {FileName} {Arguments}", psi.FileName, BuildArgLine(psi));
-        var p = new Process { StartInfo = psi };
-        p.Start();
+        var process = new Process { StartInfo = psi };
+        process.Start();
         if (writeLog)
-            DrainStderr(p);
-        return p;
+            DrainStderr(process);
+        return process;
     }
 
     /// <summary>Drains the redirected stderr pipe into the log file (append) and
     /// publishes lines to StderrLine. The drain task owns the pipe, so consumers
     /// never compete with the file writer; an undrained pipe stalls the child once
     /// the 64KB buffer fills.</summary>
-    private void DrainStderr(Process p)
+    private void DrainStderr(Process process)
     {
         _ = Task.Run(() =>
         {
@@ -150,7 +150,7 @@ public sealed class UmuCommandRunner
                 ? null
                 : new StreamWriter(wineLogPath, append: true) { AutoFlush = true };
             string? line;
-            while ((line = p.StandardError.ReadLine()) is not null)
+            while ((line = process.StandardError.ReadLine()) is not null)
             {
                 writer?.WriteLine(line);
                 StderrLine?.Invoke(line);
@@ -163,9 +163,9 @@ public sealed class UmuCommandRunner
 
     private static string BuildArgLine(ProcessStartInfo psi)
     {
-        var sb = new StringBuilder(psi.Arguments);
-        foreach (var a in psi.ArgumentList)
-            sb.Append(' ').Append(a);
-        return sb.ToString();
+        var builder = new StringBuilder(psi.Arguments);
+        foreach (var arg in psi.ArgumentList)
+            builder.Append(' ').Append(arg);
+        return builder.ToString();
     }
 }

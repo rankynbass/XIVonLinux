@@ -88,8 +88,8 @@ public sealed class UmuPrefix
     public string UnixToWinePath(string unixPath)
     {
         var drives = GetDriveSymlinks();
-        var best = drives.OrderByDescending(d => d.Value.Length)
-            .FirstOrDefault(d => unixPath == d.Value || unixPath.StartsWith(d.Value.TrimEnd('/') + "/"));
+        var best = drives.OrderByDescending(drive => drive.Value.Length)
+            .FirstOrDefault(drive => unixPath == drive.Value || unixPath.StartsWith(drive.Value.TrimEnd('/') + "/"));
 
         if (best.Key is null)
             throw new FileNotFoundException($"No prefix drive maps to unix path '{unixPath}'");
@@ -146,9 +146,9 @@ public sealed class UmuPrefix
     {
         // FileInfo.Exists is false for symlinks that target directories — read the
         // link target directly, no existence gate.
-        var fi = new FileInfo(path);
-        if (fi.LinkTarget is null)
+        var fileInfo = new FileInfo(path);
+        if (fileInfo.LinkTarget is null)
             return null;
-        return Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path)!, fi.LinkTarget));
+        return Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path)!, fileInfo.LinkTarget));
     }
 }

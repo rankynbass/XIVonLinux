@@ -84,7 +84,7 @@ public sealed class AccountManager
         {
             var wanted = UserNameOf(this.settings.Settings.CurrentAccountId);
             return this.Accounts.Count > 1
-                ? this.Accounts.FirstOrDefault(a => a.UserName == wanted) ?? this.Accounts.FirstOrDefault()
+                ? this.Accounts.FirstOrDefault(account => account.UserName == wanted) ?? this.Accounts.FirstOrDefault()
                 : this.Accounts.FirstOrDefault();
         }
         set
@@ -103,7 +103,7 @@ public sealed class AccountManager
     }
 
     public XivAccount? ByUserName(string userName) =>
-        this.Accounts.FirstOrDefault(a => a.UserName == userName.ToLower());
+        this.Accounts.FirstOrDefault(account => account.UserName == userName.ToLower());
 
     /// <summary>Unique-username add: an existing username is never duplicated. Same
     /// username with changed flags is an update (UpdateAccountFlags), not a second row.</summary>
@@ -170,7 +170,7 @@ public sealed class AccountManager
         return conn;
     }
 
-    private void PersistRow(XivAccount a, bool ignore = false)
+    private void PersistRow(XivAccount account, bool ignore = false)
     {
         // Account flags stay in accounts.db; the password goes through the active
         // secret provider (keyring / deck / dummy).
@@ -182,21 +182,21 @@ public sealed class AccountManager
                 " (user_name, save_password, use_steam_service_account, use_otp, is_free_trial," +
                 " chosen_character_name, chosen_character_world, thumbnail_url)" +
                 " VALUES ($user_name, $save_password, $use_steam, $use_otp, $trial, $char_name, $char_world, $thumb);";
-            cmd.Parameters.AddWithValue("$user_name", a.UserName);
-            cmd.Parameters.AddWithValue("$save_password", a.SavePassword ? 1 : 0);
-            cmd.Parameters.AddWithValue("$use_steam", a.UseSteamServiceAccount ? 1 : 0);
-            cmd.Parameters.AddWithValue("$use_otp", a.UseOtp ? 1 : 0);
-            cmd.Parameters.AddWithValue("$trial", a.IsFreeTrial ? 1 : 0);
-            cmd.Parameters.AddWithValue("$char_name", a.ChosenCharacterName);
-            cmd.Parameters.AddWithValue("$char_world", a.ChosenCharacterWorld);
-            cmd.Parameters.AddWithValue("$thumb", a.ThumbnailUrl);
+            cmd.Parameters.AddWithValue("$user_name", account.UserName);
+            cmd.Parameters.AddWithValue("$save_password", account.SavePassword ? 1 : 0);
+            cmd.Parameters.AddWithValue("$use_steam", account.UseSteamServiceAccount ? 1 : 0);
+            cmd.Parameters.AddWithValue("$use_otp", account.UseOtp ? 1 : 0);
+            cmd.Parameters.AddWithValue("$trial", account.IsFreeTrial ? 1 : 0);
+            cmd.Parameters.AddWithValue("$char_name", account.ChosenCharacterName);
+            cmd.Parameters.AddWithValue("$char_world", account.ChosenCharacterWorld);
+            cmd.Parameters.AddWithValue("$thumb", account.ThumbnailUrl);
             cmd.ExecuteNonQuery();
         }
 
-        if (a.SavePassword && !string.IsNullOrEmpty(a.Password))
-            this.SecretProvider.SavePassword(a.UserName, a.Password);
+        if (account.SavePassword && !string.IsNullOrEmpty(account.Password))
+            this.SecretProvider.SavePassword(account.UserName, account.Password);
         else
-            this.SecretProvider.DeletePassword(a.UserName);
+            this.SecretProvider.DeletePassword(account.UserName);
     }
 
     private void DeleteRow(string userName)
@@ -221,9 +221,9 @@ public sealed class AccountManager
         {
             conn = OpenDb();
         }
-        catch (SqliteException ex)
+        catch (SqliteException exception)
         {
-            Log.Error(ex, "accounts.db is corrupt; quarantining as accounts.db.bad and recreating it empty");
+            Log.Error(exception, "accounts.db is corrupt; quarantining as accounts.db.bad and recreating it empty");
             Quarantine(DbFile);
             conn = OpenDb();
         }
@@ -232,20 +232,20 @@ public sealed class AccountManager
         {
             ImportLegacyToml(conn);
 
-            using (var q = conn.CreateCommand())
+            using (var command = conn.CreateCommand())
             {
-                q.CommandText = "SELECT user_name, save_password, use_steam_service_account, use_otp, is_free_trial, chosen_character_name, chosen_character_world, thumbnail_url FROM accounts ORDER BY user_name;";
-                using var r = q.ExecuteReader();
-                while (r.Read())
+                command.CommandText = "SELECT user_name, save_password, use_steam_service_account, use_otp, is_free_trial, chosen_character_name, chosen_character_world, thumbnail_url FROM accounts ORDER BY user_name;";
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
                 {
-                    var acc = new XivAccount(r.GetString(0));
-                    acc.SavePassword = r.GetInt64(1) != 0;
-                    acc.UseSteamServiceAccount = r.GetInt64(2) != 0;
-                    acc.UseOtp = r.GetInt64(3) != 0;
-                    acc.IsFreeTrial = r.GetInt64(4) != 0;
-                    acc.ChosenCharacterName = r.GetString(5);
-                    acc.ChosenCharacterWorld = r.GetString(6);
-                    acc.ThumbnailUrl = r.GetString(7);
+                    var acc = new XivAccount(reader.GetString(0));
+                    acc.SavePassword = reader.GetInt64(1) != 0;
+                    acc.UseSteamServiceAccount = reader.GetInt64(2) != 0;
+                    acc.UseOtp = reader.GetInt64(3) != 0;
+                    acc.IsFreeTrial = reader.GetInt64(4) != 0;
+                    acc.ChosenCharacterName = reader.GetString(5);
+                    acc.ChosenCharacterWorld = reader.GetString(6);
+                    acc.ThumbnailUrl = reader.GetString(7);
 
                     // Password comes from the active secret provider; deck migrations
                     // already ran in DeckSecretProvider's constructor.
@@ -280,31 +280,31 @@ public sealed class AccountManager
                     TomlArray arr => arr.Cast<object>(),
                     _ => Enumerable.Empty<object>(),
                 };
-                foreach (var t in tables.OfType<TomlTable>())
+                foreach (var table in tables.OfType<TomlTable>())
                 {
-                    var acc = new XivAccount(GetStr(t, "user_name") ?? "unknown");
-                    acc.SavePassword = GetBool(t, "save_password");
-                    acc.UseSteamServiceAccount = GetBool(t, "use_steam_service_account");
-                    acc.UseOtp = GetBool(t, "use_otp");
-                    acc.IsFreeTrial = GetBool(t, "is_free_trial");
-                    acc.ChosenCharacterName = GetStr(t, "chosen_character_name") ?? "";
-                    acc.ChosenCharacterWorld = GetStr(t, "chosen_character_world") ?? "";
-                    acc.ThumbnailUrl = GetStr(t, "thumbnail_url") ?? "";
+                    var acc = new XivAccount(GetStr(table, "user_name") ?? "unknown");
+                    acc.SavePassword = GetBool(table, "save_password");
+                    acc.UseSteamServiceAccount = GetBool(table, "use_steam_service_account");
+                    acc.UseOtp = GetBool(table, "use_otp");
+                    acc.IsFreeTrial = GetBool(table, "is_free_trial");
+                    acc.ChosenCharacterName = GetStr(table, "chosen_character_name") ?? "";
+                    acc.ChosenCharacterWorld = GetStr(table, "chosen_character_world") ?? "";
+                    acc.ThumbnailUrl = GetStr(table, "thumbnail_url") ?? "";
 
                     PersistRow(acc, ignore: true);
                     imported++;
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            Log.Error(ex, "legacy accounts.toml is malformed; skipping import");
+            Log.Error(exception, "legacy accounts.toml is malformed; skipping import");
         }
 
         var dest = Path.Combine(legacy.DirectoryName!, "accounts.toml.imported");
-        var n = 1;
+        var collisionNumber = 1;
         while (File.Exists(dest))
-            dest = Path.Combine(legacy.DirectoryName!, $"accounts.toml.imported.{n++}");
+            dest = Path.Combine(legacy.DirectoryName!, $"accounts.toml.imported.{collisionNumber++}");
         File.Move(legacy.FullName, dest);
         Log.Information("Imported {Count} legacy accounts from accounts.toml into accounts.db", imported);
     }
@@ -312,15 +312,15 @@ public sealed class AccountManager
     private static void Quarantine(FileInfo file)
     {
         var badPath = Path.Combine(file.DirectoryName!, file.Name + ".bad");
-        var n = 1;
+        var collisionNumber = 1;
         while (File.Exists(badPath))
-            badPath = Path.Combine(file.DirectoryName!, $"{file.Name}.bad.{n++}");
+            badPath = Path.Combine(file.DirectoryName!, $"{file.Name}.bad.{collisionNumber++}");
         File.Move(file.FullName, badPath);
     }
 
-    private static string? GetStr(TomlTable t, string key) =>
-        t.ContainsKey(key) ? t[key] as string : null;
+    private static string? GetStr(TomlTable table, string key) =>
+        table.ContainsKey(key) ? table[key] as string : null;
 
-    private static bool GetBool(TomlTable t, string key) =>
-        t.ContainsKey(key) && t[key] is bool b && b;
+    private static bool GetBool(TomlTable table, string key) =>
+        table.ContainsKey(key) && table[key] is bool flag && flag;
 }

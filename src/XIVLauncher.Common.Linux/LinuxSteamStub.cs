@@ -27,7 +27,7 @@ public sealed class LinuxSteamStub : ISteam
 
     public bool ShowGamepadTextInput(bool password, bool multiline, string description, int maxChars, string existingText = "") => false;
     public string GetEnteredGamepadText() => string.Empty;
-    public bool ShowFloatingGamepadTextInput(ISteam.EFloatingGamepadTextInputMode mode, int x, int y, int width, int height) => false;
+    public bool ShowFloatingGamepadTextInput(ISteam.EFloatingGamepadTextInputMode mode, int xCoord, int yCoord, int width, int height) => false;
 
     public bool IsRunningOnSteamDeck() => Environment.GetEnvironmentVariable("SteamTaskId") is not null;
 

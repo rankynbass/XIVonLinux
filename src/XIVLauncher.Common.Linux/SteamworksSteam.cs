@@ -20,7 +20,7 @@ public sealed class SteamworksSteam : ISteam
 
     public SteamworksSteam()
     {
-        SteamUtils.OnGamepadTextInputDismissed += b => OnGamepadTextInputDismissed?.Invoke(b);
+        SteamUtils.OnGamepadTextInputDismissed += text => OnGamepadTextInputDismissed?.Invoke(text);
     }
 
     public void Initialize(uint appId)
@@ -63,9 +63,9 @@ public sealed class SteamworksSteam : ISteam
 
     public string GetEnteredGamepadText() => SteamUtils.GetEnteredGamepadText();
 
-    public bool ShowFloatingGamepadTextInput(ISteam.EFloatingGamepadTextInputMode mode, int x, int y, int width, int height)
+    public bool ShowFloatingGamepadTextInput(ISteam.EFloatingGamepadTextInputMode mode, int xCoord, int yCoord, int width, int height)
     {
-        SteamUtils.ShowFloatingGamepadTextInput((TextInputMode)mode, x, y, width, height);
+        SteamUtils.ShowFloatingGamepadTextInput((TextInputMode)mode, xCoord, yCoord, width, height);
         return true;
     }
 

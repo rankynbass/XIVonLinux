@@ -22,10 +22,10 @@ public partial class SettingsWindow : Window
 
     private static HttpClient CreateBranchClient()
     {
-        var c = new HttpClient();
-        c.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent",
+        var client = new HttpClient();
+        client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent",
             "XIVonLinux/0.1 (FFXIV launcher; https://github.com/rankynbass/XIVonLinux)");
-        return c;
+        return client;
     }
 
     public SettingsWindow()
@@ -37,38 +37,38 @@ public partial class SettingsWindow : Window
     public SettingsWindow(SettingsService service) : this()
     {
         this.settingsService = service;
-        var s = service.Settings;
-        GamePathBox.Text = s.GamePath;
-        ConfigPathBox.Text = s.ConfigPath;
-        PatchPathBox.Text = s.PatchPath;
-        ProtonPathBox.Text = s.ProtonPath;
-        PrefixPathBox.Text = s.PrefixPath;
-        DxvkCheck.IsChecked = s.EnableDxvk;
-        ExtraWineDllOverridesBox.Text = s.ExtraWineDllOverrides;
-        WineDebugCheck.IsChecked = s.WineDebugEnabled;
-        WineDebugBox.Text = string.IsNullOrWhiteSpace(s.WineDebugValue) ? LaunchSettings.DefaultWineDebugValue : s.WineDebugValue;
+        var settings = service.Settings;
+        GamePathBox.Text = settings.GamePath;
+        ConfigPathBox.Text = settings.ConfigPath;
+        PatchPathBox.Text = settings.PatchPath;
+        ProtonPathBox.Text = settings.ProtonPath;
+        PrefixPathBox.Text = settings.PrefixPath;
+        DxvkCheck.IsChecked = settings.EnableDxvk;
+        ExtraWineDllOverridesBox.Text = settings.ExtraWineDllOverrides;
+        WineDebugCheck.IsChecked = settings.WineDebugEnabled;
+        WineDebugBox.Text = string.IsNullOrWhiteSpace(settings.WineDebugValue) ? LaunchSettings.DefaultWineDebugValue : settings.WineDebugValue;
         WineDebugBox.IsEnabled = WineDebugCheck.IsChecked == true;
         LanguageCombo.Items.Add("English");
         LanguageCombo.Items.Add("Japanese");
         LanguageCombo.Items.Add("German");
         LanguageCombo.Items.Add("French");
-        LanguageCombo.SelectedItem = s.Language;
+        LanguageCombo.SelectedItem = settings.Language;
         if (LanguageCombo.SelectedItem is null)
             LanguageCombo.SelectedIndex = 0;
 
         // XIVLauncher.Core Game tab parity: extra args, DPI awareness, Steam-ignore,
         // XL auth macros, uid cache toggle + reset panel.
-        AdditionalArgsBox.Text = s.AdditionalArgs;
+        AdditionalArgsBox.Text = settings.AdditionalArgs;
         DpiCombo.Items.Add("Aware");
         DpiCombo.Items.Add("Unaware");
-        DpiCombo.SelectedItem = s.DpiAwareness;
+        DpiCombo.SelectedItem = settings.DpiAwareness;
         if (DpiCombo.SelectedItem is null)
             DpiCombo.SelectedIndex = 1;   // Unaware default
-        IgnoreSteamCheck.IsChecked = s.IgnoreSteam;
-        XlAuthCheck.IsChecked = s.UseXlAuthMacros;
-        UidCacheCheck.IsChecked = s.UseUidCache;
+        IgnoreSteamCheck.IsChecked = settings.IgnoreSteam;
+        XlAuthCheck.IsChecked = settings.UseXlAuthMacros;
+        UidCacheCheck.IsChecked = settings.UseUidCache;
         UidCachePanel.IsVisible = false;   // UID cache UI hidden until implemented
-        DalamudCheck.IsChecked = s.DalamudEnabled;
+        DalamudCheck.IsChecked = settings.DalamudEnabled;
 
         // Dalamud tab (XIVLauncher.Core parity): load method, branch, injection delay,
         // manual injector override. Combo Tags carry the DalamudLoadMethod enum names.
@@ -76,14 +76,14 @@ public partial class SettingsWindow : Window
         LoadMethodCombo.Items.Add(new ComboBoxItem { Content = "DLL Injection", Tag = "DllInject" });
         LoadMethodCombo.Items.Add(new ComboBoxItem { Content = "ACL-only fix", Tag = "ACLonly" });
         foreach (var item in LoadMethodCombo.Items)
-            if ((item as ComboBoxItem)?.Tag as string == s.LoadMethod)
+            if ((item as ComboBoxItem)?.Tag as string == settings.LoadMethod)
                 LoadMethodCombo.SelectedItem = item;
         if (LoadMethodCombo.SelectedItem is null)
             LoadMethodCombo.SelectedIndex = 0;   // Entrypoint default
-        InjectionDelayBox.Text = s.LoadDelay.ToString();
-        ManualInjectCheck.IsChecked = s.ManualInjectEnabled;
-        ManualInjectPathBox.Text = s.ManualInjectPath;
-        ApplyManualInjectMode(s.ManualInjectEnabled);
+        InjectionDelayBox.Text = settings.LoadDelay.ToString();
+        ManualInjectCheck.IsChecked = settings.ManualInjectEnabled;
+        ManualInjectPathBox.Text = settings.ManualInjectPath;
+        ApplyManualInjectMode(settings.ManualInjectEnabled);
 
         // Branch combo fills once Kamori meta arrives, like XIVLauncher.Core's
         // DalamudBranchMetaSettingsEntry (created disabled, populated on fetch).
@@ -91,18 +91,18 @@ public partial class SettingsWindow : Window
         // (Track "", i.e. the updater's default release path).
         BranchCombo.Items.Add(new ComboBoxItem { Content = "Release", Tag = "" });
         BranchCombo.SelectedIndex = 0;
-        if (!string.IsNullOrEmpty(s.BranchTrack))
-            BranchCombo.Items[^1] = new ComboBoxItem { Content = s.BranchTrack, Tag = s.BranchTrack };
+        if (!string.IsNullOrEmpty(settings.BranchTrack))
+            BranchCombo.Items[^1] = new ComboBoxItem { Content = settings.BranchTrack, Tag = settings.BranchTrack };
         _ = LoadBranchesAsync();
 
         // Proton enumeration (Alex): managed mode picks from the Proton builds found in
         // Steam compatibilitytools.d, steamapps/common, and the app's tools/proton dir.
         foreach (var dir in EnumerateProtonDirs())
             ProtonCombo.Items.Add(dir);
-        if (ProtonCombo.Items.Contains(s.ProtonPath))
-            ProtonCombo.SelectedItem = s.ProtonPath;
-        ManagedProtonCheck.IsChecked = s.ManagedProton;
-        ApplyProtonMode(s.ManagedProton);
+        if (ProtonCombo.Items.Contains(settings.ProtonPath))
+            ProtonCombo.SelectedItem = settings.ProtonPath;
+        ManagedProtonCheck.IsChecked = settings.ManagedProton;
+        ApplyProtonMode(settings.ManagedProton);
 
         // Umu enumeration (Alex): managed mode picks the latest/previous managed zipapp
         // installs under ~/.xivonlinux/tools/umu; custom mode is a folder picker for a
@@ -110,15 +110,15 @@ public partial class SettingsWindow : Window
         var umuTags = EnumerateUmuTags();
         for (var i = 0; i < umuTags.Count; i++)
             UmuCombo.Items.Add(i == 0 ? $"{umuTags[i]} (latest)" : $"{umuTags[i]} (previous)");
-        var savedTag = s.UmuTag;
+        var savedTag = settings.UmuTag;
         for (var i = 0; i < umuTags.Count; i++)
             if (umuTags[i] == savedTag)
                 UmuCombo.SelectedIndex = i;
         if (UmuCombo.SelectedIndex < 0 && UmuCombo.Items.Count > 0)
             UmuCombo.SelectedIndex = 0;
-        UmuPathBox.Text = s.UmuPath;
-        ManagedUmuCheck.IsChecked = s.ManagedUmu;
-        ApplyUmuMode(s.ManagedUmu);
+        UmuPathBox.Text = settings.UmuPath;
+        ManagedUmuCheck.IsChecked = settings.ManagedUmu;
+        ApplyUmuMode(settings.ManagedUmu);
     }
 
     /// <summary>Managed zipapp tags installed under ~/.xivonlinux/tools/umu (dirs that
@@ -131,14 +131,14 @@ public partial class SettingsWindow : Window
             return new List<string>();
         var tags = Directory.GetDirectories(root)
             .Select(Path.GetFileName)
-            .Where(t => t is not null && File.Exists(Path.Combine(root, t!, "umu-run")))
-            .Select(t => t!)
+            .Where(tag => tag is not null && File.Exists(Path.Combine(root, tag!, "umu-run")))
+            .Select(tag => tag!)
             .ToList();
-        tags.Sort((a, b) =>
+        tags.Sort((verA, verB) =>
         {
-            var va = Version.TryParse(a, out var x) ? x : new Version(0, 0);
-            var vb = Version.TryParse(b, out var y) ? y : new Version(0, 0);
-            return vb.CompareTo(va);
+            var versionA = Version.TryParse(verA, out var parsedVerA) ? parsedVerA : new Version(0, 0);
+            var versionB = Version.TryParse(verB, out var parsedVerB) ? parsedVerB : new Version(0, 0);
+            return versionB.CompareTo(versionA);
         });
         return tags;
     }
@@ -154,15 +154,15 @@ public partial class SettingsWindow : Window
             UmuCombo.SelectedIndex = 0;
     }
 
-    private void OnManagedUmuToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnManagedUmuToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
         => ApplyUmuMode(ManagedUmuCheck.IsChecked == true);
 
     /// <summary>The WINEDEBUG value box edits only while logging is enabled; when
     /// disabled, launches force WINEDEBUG=-all.</summary>
-    private void OnWineDebugToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnWineDebugToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
         => WineDebugBox.IsEnabled = WineDebugCheck.IsChecked == true;
 
-    private void OnUmuCombo(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnUmuCombo(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
     {
         // Keep the custom textbox in sync with the selection (tag without the display suffix).
         if (UmuCombo.SelectedItem is string sel)
@@ -172,7 +172,7 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private async void OnBrowseUmu(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnBrowseUmu(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
         => await PickFolderAsync(UmuPathBox);
 
     /// <summary>Proton tool directories: any folder containing a top-level `proton` script
@@ -192,9 +192,9 @@ public partial class SettingsWindow : Window
         {
             if (!Directory.Exists(root))
                 continue;
-            foreach (var d in Directory.GetDirectories(root))
-                if (File.Exists(Path.Combine(d, "proton")))
-                    found.Add(d);
+            foreach (var dir in Directory.GetDirectories(root))
+                if (File.Exists(Path.Combine(dir, "proton")))
+                    found.Add(dir);
         }
         return found;
     }
@@ -212,28 +212,28 @@ public partial class SettingsWindow : Window
             ProtonCombo.SelectedIndex = 0;
     }
 
-    private void OnManagedProtonToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnManagedProtonToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
         => ApplyProtonMode(ManagedProtonCheck.IsChecked == true);
 
-    private void OnProtonCombo(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnProtonCombo(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
     {
         if (ProtonCombo.SelectedItem is string path)
             ProtonPathBox.Text = path;   // keep the text row in sync for custom mode
     }
 
-    private async void OnBrowseGame(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnBrowseGame(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
         => await PickFolderAsync(GamePathBox);
 
-    private async void OnBrowseConfig(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnBrowseConfig(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
         => await PickFolderAsync(ConfigPathBox);
 
-    private async void OnBrowsePatch(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnBrowsePatch(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
         => await PickFolderAsync(PatchPathBox);
 
-    private async void OnBrowseProton(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnBrowseProton(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
         => await PickFolderAsync(ProtonPathBox);
 
-    private async void OnBrowsePrefix(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnBrowsePrefix(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
         => await PickFolderAsync(PrefixPathBox);
 
     private async Task PickFolderAsync(TextBox box)
@@ -259,14 +259,14 @@ public partial class SettingsWindow : Window
 
         Dispatcher.UIThread.Post(() =>
         {
-            foreach (var b in fetched)
-                if (!b.Hidden)
-                    this.branches.Add(b);
+            foreach (var verB in fetched)
+                if (!verB.Hidden)
+                    this.branches.Add(verB);
 
             BranchCombo.Items.Clear();
             BranchCombo.Items.Add(new ComboBoxItem { Content = "Release", Tag = "" });
-            foreach (var b in this.branches)
-                BranchCombo.Items.Add(new ComboBoxItem { Content = b.DisplayName, Tag = b.Track });
+            foreach (var verB in this.branches)
+                BranchCombo.Items.Add(new ComboBoxItem { Content = verB.DisplayName, Tag = verB.Track });
 
             var saved = this.settingsService.Settings.BranchTrack;
             for (var i = 0; i < BranchCombo.Items.Count; i++)
@@ -287,21 +287,21 @@ public partial class SettingsWindow : Window
         ManualInjectBrowseButton.IsVisible = enabled;
     }
 
-    private void OnManualInjectToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnManualInjectToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
         => ApplyManualInjectMode(ManualInjectCheck.IsChecked == true);
 
-    private async void OnBrowseManualInject(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnBrowseManualInject(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
         => await PickFolderAsync(ManualInjectPathBox);
 
     /// <summary>UID cache panel shows only while the cache toggle is on (XIVLauncher.Core footer).</summary>
-    private void OnUidCacheToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnUidCacheToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
     {
         UidCachePanel.IsVisible = UidCacheCheck.IsChecked == true;
     }
 
     /// <summary>Clears the cached uid and persists; the launcher must restart to take effect
     /// (XIVLauncher.Core: "you must then restart the launcher").</summary>
-    private void OnResetUidCache(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnResetUidCache(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
     {
         if (this.settingsService is null)
             return;
@@ -321,74 +321,74 @@ public partial class SettingsWindow : Window
             CanResize = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
         };
-        var ok = new Button { Content = "OK", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, Margin = new Avalonia.Thickness(0, 12, 0, 0) };
-        ok.Click += (_, _) => popup.Close();
+        var okButton = new Button { Content = "OK", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, Margin = new Avalonia.Thickness(0, 12, 0, 0) };
+        okButton.Click += (_, _) => popup.Close();
         popup.Content = new StackPanel
         {
             Margin = new Avalonia.Thickness(16, 12, 16, 12),
-            Children = { new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap }, ok },
+            Children = { new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap }, okButton },
         };
         popup.ShowDialog(this);
     }
 
     /// <summary>Persist all settings, close the modal; the main window refocuses afterwards.</summary>
-    private void OnSave(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnSave(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
     {
         if (this.settingsService is null)
             return;
-        var s = this.settingsService.Settings;
-        s.GamePath = GamePathBox.Text;
-        s.ConfigPath = ConfigPathBox.Text;
-        s.PatchPath = PatchPathBox.Text;
-        s.Language = LanguageCombo.SelectedItem as string ?? "English";
+        var settings = this.settingsService.Settings;
+        settings.GamePath = GamePathBox.Text;
+        settings.ConfigPath = ConfigPathBox.Text;
+        settings.PatchPath = PatchPathBox.Text;
+        settings.Language = LanguageCombo.SelectedItem as string ?? "English";
 
         // XIVLauncher.Core CheckValidity: game folder must be set, and must not be the
         // game/ or boot/ subfolder of an FFXIV install (the common mispick).
-        var gameName = Path.GetFileName(s.GamePath.TrimEnd('/', '\\'));
-        if (string.IsNullOrEmpty(s.GamePath) || gameName == "game" || gameName == "boot")
+        var gameName = Path.GetFileName(settings.GamePath.TrimEnd('/', '\\'));
+        if (string.IsNullOrEmpty(settings.GamePath) || gameName == "game" || gameName == "boot")
         {
             ShowAlert("GamePath is invalid — pick the FFXIV install folder (the one containing\n" +
                       "the game/ and boot/ subfolders), not game/ or boot/ itself.");
             return;
         }
 
-        s.AdditionalArgs = AdditionalArgsBox.Text;
-        s.DpiAwareness = DpiCombo.SelectedItem as string ?? "Unaware";
-        s.IgnoreSteam = IgnoreSteamCheck.IsChecked == true;
-        s.UseXlAuthMacros = XlAuthCheck.IsChecked == true;
-        s.UseUidCache = UidCacheCheck.IsChecked == true;
-        s.ManagedProton = ManagedProtonCheck.IsChecked == true;
-        if (s.ManagedProton && ProtonCombo.SelectedItem is string pick)
-            s.ProtonPath = pick;   // managed mode: the enumerated selection wins
+        settings.AdditionalArgs = AdditionalArgsBox.Text;
+        settings.DpiAwareness = DpiCombo.SelectedItem as string ?? "Unaware";
+        settings.IgnoreSteam = IgnoreSteamCheck.IsChecked == true;
+        settings.UseXlAuthMacros = XlAuthCheck.IsChecked == true;
+        settings.UseUidCache = UidCacheCheck.IsChecked == true;
+        settings.ManagedProton = ManagedProtonCheck.IsChecked == true;
+        if (settings.ManagedProton && ProtonCombo.SelectedItem is string pick)
+            settings.ProtonPath = pick;   // managed mode: the enumerated selection wins
         else
-            s.ProtonPath = ProtonPathBox.Text;
-        s.ManagedUmu = ManagedUmuCheck.IsChecked == true;
-        if (s.ManagedUmu && UmuCombo.SelectedItem is string umuSel)
-            s.UmuTag = umuSel.Split(" (")[0];   // managed mode: strip the display suffix
-        s.UmuPath = UmuPathBox.Text;            // custom mode: picked folder containing umu-run
-        s.PrefixPath = PrefixPathBox.Text;
-        s.EnableDxvk = DxvkCheck.IsChecked == true;
-        s.ExtraWineDllOverrides = ExtraWineDllOverridesBox.Text;
-        s.WineDebugEnabled = WineDebugCheck.IsChecked == true;
-        s.WineDebugValue = string.IsNullOrWhiteSpace(WineDebugBox.Text)
+            settings.ProtonPath = ProtonPathBox.Text;
+        settings.ManagedUmu = ManagedUmuCheck.IsChecked == true;
+        if (settings.ManagedUmu && UmuCombo.SelectedItem is string umuSel)
+            settings.UmuTag = umuSel.Split(" (")[0];   // managed mode: strip the display suffix
+        settings.UmuPath = UmuPathBox.Text;            // custom mode: picked folder containing umu-run
+        settings.PrefixPath = PrefixPathBox.Text;
+        settings.EnableDxvk = DxvkCheck.IsChecked == true;
+        settings.ExtraWineDllOverrides = ExtraWineDllOverridesBox.Text;
+        settings.WineDebugEnabled = WineDebugCheck.IsChecked == true;
+        settings.WineDebugValue = string.IsNullOrWhiteSpace(WineDebugBox.Text)
             ? LaunchSettings.DefaultWineDebugValue : WineDebugBox.Text;
-        s.DalamudEnabled = DalamudCheck.IsChecked == true;
+        settings.DalamudEnabled = DalamudCheck.IsChecked == true;
 
         // Dalamud tab: load method name, delay, branch, manual injector path.
-        s.LoadMethod = (LoadMethodCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "DllInject";
-        s.LoadDelay = int.TryParse(InjectionDelayBox.Text, out var delay) && delay >= 0 ? delay : 1000;
-        s.ManualInjectEnabled = ManualInjectCheck.IsChecked == true;
-        s.ManualInjectPath = ManualInjectPathBox.Text;
-        if (s.ManualInjectEnabled &&
-            (string.IsNullOrEmpty(s.ManualInjectPath) || !Directory.Exists(s.ManualInjectPath) ||
-             !File.Exists(Path.Combine(s.ManualInjectPath, "Dalamud.Injector.exe"))))
+        settings.LoadMethod = (LoadMethodCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "DllInject";
+        settings.LoadDelay = int.TryParse(InjectionDelayBox.Text, out var delay) && delay >= 0 ? delay : 1000;
+        settings.ManualInjectEnabled = ManualInjectCheck.IsChecked == true;
+        settings.ManualInjectPath = ManualInjectPathBox.Text;
+        if (settings.ManualInjectEnabled &&
+            (string.IsNullOrEmpty(settings.ManualInjectPath) || !Directory.Exists(settings.ManualInjectPath) ||
+             !File.Exists(Path.Combine(settings.ManualInjectPath, "Dalamud.Injector.exe"))))
         {
             ShowAlert("Manual injection needs a folder containing Dalamud.Injector.exe.\nFix the path, or untick manual injection.");
             return;   // do not persist/close with an invalid override
         }
         var selBranch = (BranchCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
-        s.BranchTrack = selBranch;
-        s.BranchKey = this.branches.Find(b => b.Track == selBranch)?.Key ?? "";
+        settings.BranchTrack = selBranch;
+        settings.BranchKey = this.branches.Find(verB => verB.Track == selBranch)?.Key ?? "";
 
         this.settingsService.Save();
         Close();

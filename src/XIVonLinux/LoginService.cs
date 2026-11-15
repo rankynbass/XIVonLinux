@@ -60,9 +60,9 @@ public sealed class LoginService : IDisposable
             var gate = await launcher.GetGateStatus(language);
             return gate.Status;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            Log.Error(ex, "Could not obtain gate status");
+            Log.Error(exception, "Could not obtain gate status");
             return false;
         }
     }
@@ -184,7 +184,7 @@ public sealed class LoginService : IDisposable
                 rows.Add(new DownloadSlotInfo { VersionId = d.Patch.VersionId, Total = d.Patch.Length, Downloaded = 0, SpeedBps = 0, State = "installing" });
         }
 
-        return rows.OrderByDescending(r => r.State == "queued" ? -1 : r.Downloaded).Take(5).ToList();
+        return rows.OrderByDescending(row => row.State == "queued" ? -1 : row.Downloaded).Take(5).ToList();
     }
 
     /// <summary>
@@ -240,7 +240,7 @@ public sealed class LoginService : IDisposable
 
         var speed = 0d;
         foreach (var s in patcher.Speeds) speed += s;
-        status($"{repo} done: {(done ? "ok" : "FAILED")}, {total} patches, last speed {speed / 1024 / 1024:0.0} MB/s");
+        status($"{repo} done: {(done ? "verified" : "FAILED")}, {total} patches, last speed {speed / 1024 / 1024:0.0} MB/s");
 
         return done;
     }
@@ -331,11 +331,11 @@ public sealed class LoginService : IDisposable
         }
 
         status($"Downloaded {patch.VersionId} ({patch.Length / 1048576} MB), verifying SHA1 ...");
-        var ok = VerifyPatchHashes(patch, outFile);
-        status(ok ? $"SHA1 verify PASS: {patch.VersionId} ({patch.Hashes.Length} blocks)"
+        var verified = VerifyPatchHashes(patch, outFile);
+        status(verified ? $"SHA1 verify PASS: {patch.VersionId} ({patch.Hashes.Length} blocks)"
                   : $"SHA1 verify FAIL: {patch.VersionId} at block {failBlock}");
-        Log.Information("[DOWNLOAD] {VersionId} sha1 verify {Result} (block {Block})", patch.VersionId, ok ? "PASS" : "FAIL", failBlock);
-        return ok;
+        Log.Information("[DOWNLOAD] {VersionId} sha1 verify {Result} (block {Block})", patch.VersionId, verified ? "PASS" : "FAIL", failBlock);
+        return verified;
     }
 
     private static int failBlock;
@@ -387,10 +387,10 @@ public sealed class LoginService : IDisposable
                 block = block.AsSpan(0, read).ToArray();
 
             var hash = SHA1.HashData(block);
-            var sb = new StringBuilder(hash.Length * 2);
-            foreach (var b in hash) sb.Append(b.ToString("x2"));
+            var builder = new StringBuilder(hash.Length * 2);
+            foreach (var byteVal in hash) builder.Append(byteVal.ToString("x2"));
 
-            if (sb.ToString() != patch.Hashes[i])
+            if (builder.ToString() != patch.Hashes[i])
             {
                 failBlock = i;
                 return false;
@@ -416,8 +416,8 @@ public sealed class LoginService : IDisposable
         }
 
         var report = $"{bootHash}\n";
-        for (var ex = 1; ex <= exLevel && ex <= 5; ex++)
-            report += $"ex{ex}\t{Constants.BASE_GAME_VERSION}\n";
+        for (var exception = 1; exception <= exLevel && exception <= 5; exception++)
+            report += $"ex{exception}\t{Constants.BASE_GAME_VERSION}\n";
 
         return report;
     }
@@ -425,10 +425,10 @@ public sealed class LoginService : IDisposable
     private static string FileHashSha1(string file)
     {
         var hash = SHA1.HashData(File.ReadAllBytes(file));
-        var sb = new StringBuilder(hash.Length * 2);
-        foreach (var b in hash) sb.Append(b.ToString("x2"));
+        var builder = new StringBuilder(hash.Length * 2);
+        foreach (var byteVal in hash) builder.Append(byteVal.ToString("x2"));
         // GetFileHash shape: length + "/" + sha1hex
-        return new FileInfo(file).Length + "/" + sb.ToString();
+        return new FileInfo(file).Length + "/" + builder.ToString();
     }
 
     /// <summary>

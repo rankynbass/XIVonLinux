@@ -46,14 +46,14 @@ public sealed class UmuManager
             return new List<string>();
         var tags = Directory.GetDirectories(ToolsRoot)
             .Select(Path.GetFileName)
-            .Where(t => t is not null && File.Exists(Path.Combine(ToolsRoot, t!, "umu-run")))
-            .Select(t => t!)
+            .Where(tag => tag is not null && File.Exists(Path.Combine(ToolsRoot, tag!, "umu-run")))
+            .Select(tag => tag!)
             .ToList();
-        tags.Sort((a, b) =>
+        tags.Sort((verA, verB) =>
         {
-            var va = Version.TryParse(a, out var x) ? x : new Version(0, 0);
-            var vb = Version.TryParse(b, out var y) ? y : new Version(0, 0);
-            return vb.CompareTo(va);
+            var versionA = Version.TryParse(verA, out var verX) ? verX : new Version(0, 0);
+            var versionB = Version.TryParse(verB, out var verY) ? verY : new Version(0, 0);
+            return versionB.CompareTo(versionA);
         });
         return tags;
     }
@@ -61,8 +61,8 @@ public sealed class UmuManager
     /// <summary>The umu-run path for a managed tag; null when not installed.</summary>
     public string? PathForTag(string tag)
     {
-        var p = Path.Combine(ToolsRoot, tag, "umu-run");
-        return File.Exists(p) ? p : null;
+        var path = Path.Combine(ToolsRoot, tag, "umu-run");
+        return File.Exists(path) ? path : null;
     }
 
     /// <summary>The executable to invoke for prefix/game/injector runs: the newest managed
@@ -76,8 +76,8 @@ public sealed class UmuManager
         if (!Directory.Exists(ToolsRoot))
             return null;
         var installed = Directory.GetDirectories(ToolsRoot)
-            .Where(d => File.Exists(Path.Combine(d, "umu-run")))
-            .OrderByDescending(d => Version.TryParse(Path.GetFileName(d), out var v) ? v : new Version(0, 0))
+            .Where(dir => File.Exists(Path.Combine(dir, "umu-run")))
+            .OrderByDescending(dir => Version.TryParse(Path.GetFileName(dir), out var parsedVer) ? parsedVer : new Version(0, 0))
             .ToList();
         return installed.Count > 0 ? Path.Combine(installed[0], "umu-run") : null;
     }
@@ -96,19 +96,19 @@ public sealed class UmuManager
             using var resp = await http.GetAsync(ReleasesApi);
             resp.EnsureSuccessStatusCode();
             using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
-            foreach (var r in doc.RootElement.EnumerateArray())
+            foreach (var release in doc.RootElement.EnumerateArray())
             {
-                var tag = r.GetProperty("tag_name").GetString() ?? "";
+                var tag = release.GetProperty("tag_name").GetString() ?? "";
                 if (tag.Length == 0 || tag.Contains("rc", StringComparison.OrdinalIgnoreCase)
                     || tag.Contains("beta", StringComparison.OrdinalIgnoreCase)
                     || tag.Contains("alpha", StringComparison.OrdinalIgnoreCase))
                     continue;
                 string? url = null;
-                foreach (var a in r.GetProperty("assets").EnumerateArray())
+                foreach (var verA in release.GetProperty("assets").EnumerateArray())
                 {
-                    var name = a.GetProperty("name").GetString() ?? "";
+                    var name = verA.GetProperty("name").GetString() ?? "";
                     if (name.EndsWith("-zipapp.tar"))
-                        url = a.GetProperty("browser_download_url").GetString();
+                        url = verA.GetProperty("browser_download_url").GetString();
                 }
                 if (url is not null)
                     releases.Add((tag, url));
@@ -116,9 +116,9 @@ public sealed class UmuManager
                     break;
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            Log.Warning(ex, "umu releases fetch failed; keeping current tools/umu state");
+            Log.Warning(exception, "umu releases fetch failed; keeping current tools/umu state");
             return;
         }
 
@@ -133,22 +133,22 @@ public sealed class UmuManager
             {
                 await DownloadAndExtractAsync(tag, url, dir);
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                Log.Warning(ex, "umu {Tag} download/extract failed", tag);
+                Log.Warning(exception, "umu {Tag} download/extract failed", tag);
                 if (Directory.Exists(dir))
                     try { Directory.Delete(dir, true); } catch { }
             }
         }
 
         // Prune versions outside the kept pair (bad-update rollback keeps latest+previous).
-        var keep = new HashSet<string>(releases.Select(r => r.tag));
-        foreach (var d in Directory.GetDirectories(ToolsRoot))
+        var keep = new HashSet<string>(releases.Select(release => release.tag));
+        foreach (var dir in Directory.GetDirectories(ToolsRoot))
         {
-            if (keep.Contains(Path.GetFileName(d)))
+            if (keep.Contains(Path.GetFileName(dir)))
                 continue;
-            try { Directory.Delete(d, true); }
-            catch (Exception ex) { Log.Warning(ex, "umu prune {Dir} failed", d); }
+            try { Directory.Delete(dir, true); }
+            catch (Exception exception) { Log.Warning(exception, "umu prune {Dir} failed", dir); }
         }
     }
 
@@ -157,10 +157,10 @@ public sealed class UmuManager
         Directory.CreateDirectory(target);
         var tarPath = Path.Combine(ToolsRoot, $"{tag}-zipapp.tar");
 
-        using (var fs = File.Create(tarPath))
+        using (var fileStream = File.Create(tarPath))
         {
             await using var stream = await http.GetStreamAsync(url);
-            await stream.CopyToAsync(fs);
+            await stream.CopyToAsync(fileStream);
         }
 
         // The tar packs a top-level umu/ directory (umu-run + umu_run.py); extract into a
@@ -170,12 +170,12 @@ public sealed class UmuManager
         TarFile.ExtractToDirectory(tarPath, staging, true);
         var packed = Path.Combine(staging, "umu");
         var src = Directory.Exists(packed) ? packed : staging;
-        foreach (var f in Directory.GetFiles(src, "*", SearchOption.AllDirectories))
+        foreach (var file in Directory.GetFiles(src, "*", SearchOption.AllDirectories))
         {
-            var rel = Path.GetRelativePath(src, f);
+            var rel = Path.GetRelativePath(src, file);
             var outPath = Path.Combine(target, rel);
             Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-            File.Move(f, outPath, true);
+            File.Move(file, outPath, true);
         }
         Directory.Delete(staging, true);
         File.Delete(tarPath);

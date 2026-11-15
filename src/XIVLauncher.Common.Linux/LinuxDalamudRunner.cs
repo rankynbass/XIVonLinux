@@ -165,12 +165,12 @@ public sealed class LinuxDalamudRunner : IDalamudRunner
             args.Add(DalamudInjectorArgs.FAKE_ARGUMENTS);
 
         if (!string.IsNullOrWhiteSpace(additionalInjectorArgs))
-            foreach (var a in additionalInjectorArgs.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-                args.Add(a);
+            foreach (var arg in additionalInjectorArgs.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                args.Add(arg);
 
         args.Add("--");
-        foreach (var a in gameArgs.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-            args.Add(a);
+        foreach (var arg in gameArgs.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            args.Add(arg);
 
         return args;
     }
@@ -184,21 +184,21 @@ public sealed class LinuxDalamudRunner : IDalamudRunner
 
         Process? best = null;
         DateTime bestStart = default;
-        foreach (var p in candidates)
+        foreach (var proc in candidates)
         {
             try
             {
-                var st = p.StartTime;
-                Log.Information("  pid {P} start {S}", p.Id, st);
-                if (best is null || st > bestStart)
+                var startTime = proc.StartTime;
+                Log.Information("  pid {P} start {S}", proc.Id, startTime);
+                if (best is null || startTime > bestStart)
                 {
-                    bestStart = st;
-                    best = p;
+                    bestStart = startTime;
+                    best = proc;
                 }
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                Log.Information("  pid {P} start time unavailable: {E}", p.Id, e.Message);
+                Log.Information("  pid {P} start time unavailable: {E}", proc.Id, exception.Message);
             }
         }
 

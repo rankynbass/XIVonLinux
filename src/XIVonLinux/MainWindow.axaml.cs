@@ -58,11 +58,11 @@ public partial class MainWindow : Window
     /// <summary>Fire-and-forget the updater for the saved branch (empty track = release).</summary>
     private void RunDalamudUpdaterForBranch()
     {
-        var s = this.settingsService.Settings;
+        var settings = this.settingsService.Settings;
         this.dalamudUpdater.Run(
-            string.IsNullOrEmpty(s.BranchTrack) ? null : s.BranchTrack,
-            string.IsNullOrEmpty(s.BranchKey) ? null : s.BranchKey);
-        this.lastBranchTrack = s.BranchTrack;
+            string.IsNullOrEmpty(settings.BranchTrack) ? null : settings.BranchTrack,
+            string.IsNullOrEmpty(settings.BranchKey) ? null : settings.BranchKey);
+        this.lastBranchTrack = settings.BranchTrack;
     }
 
     /// <summary>umu-run to invoke, resolved from settings: the managed latest/previous
@@ -70,18 +70,18 @@ public partial class MainWindow : Window
     /// to the newest managed install, then the system binary.</summary>
     private string ResolveUmuRunPath()
     {
-        var s = this.settingsService.Settings;
-        if (s.ManagedUmu)
+        var settings = this.settingsService.Settings;
+        if (settings.ManagedUmu)
         {
-            var p = this.umuManager.PathForTag(s.UmuTag);
-            if (p is not null)
-                return p;
+            var path = this.umuManager.PathForTag(settings.UmuTag);
+            if (path is not null)
+                return path;
         }
-        else if (!string.IsNullOrEmpty(s.UmuPath))
+        else if (!string.IsNullOrEmpty(settings.UmuPath))
         {
-            var p = Path.Combine(s.UmuPath, "umu-run");
-            if (File.Exists(p))
-                return p;
+            var path = Path.Combine(settings.UmuPath, "umu-run");
+            if (File.Exists(path))
+                return path;
         }
         return this.umuManager.UmuRunPath();
     }
@@ -111,10 +111,10 @@ public partial class MainWindow : Window
         _ = Task.Run(this.umuManager.EnsureLatestTwoAsync);   // background umu version sync
         // Login fields are not persisted in settings.toml: identity is prefilled from the
         // current account in accounts.db below; defaults are username "", Steam on, trial off.
-        var s = this.settingsService.Settings;
-        UsernameBox.Text = s.Username;
-        SteamAccountCheck.IsChecked = s.SteamAccount;
-        FreeTrialCheck.IsChecked = s.FreeTrial;
+        var settings = this.settingsService.Settings;
+        UsernameBox.Text = settings.Username;
+        SteamAccountCheck.IsChecked = settings.SteamAccount;
+        FreeTrialCheck.IsChecked = settings.FreeTrial;
 
         // Pre-select the saved current account (XIVLauncher.Core startup shape).
         var saved = this.accounts.CurrentAccount;
@@ -125,9 +125,9 @@ public partial class MainWindow : Window
         // never render — the documented dynamic-item pattern is ContextMenu.Opening.
         AccountsButton.Click += (_, _) =>
         {
-            var cm = new ContextMenu();
-            BuildAccountsMenu(cm);   // Open() does not raise Opening in Avalonia 12.1.4, so build first
-            cm.Open(AccountsButton);
+            var menu = new ContextMenu();
+            BuildAccountsMenu(menu);   // Open() does not raise Opening in Avalonia 12.1.4, so build first
+            menu.Open(AccountsButton);
         };
 
         this.dalamudUpdater = new DalamudUpdater(NewsHttp,
@@ -154,12 +154,12 @@ public partial class MainWindow : Window
 
     /// <summary>Modal settings window over the main page; Save persists and closes,
     /// then the main page is refocused.</summary>
-    private async void OnSettings(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnSettings(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
     {
         var dlg = new SettingsWindow(this.settingsService);
         await dlg.ShowDialog(this);
-        var s = this.settingsService.Settings;
-        if (s.BranchTrack != this.lastBranchTrack)
+        var settings = this.settingsService.Settings;
+        if (settings.BranchTrack != this.lastBranchTrack)
             RunDalamudUpdaterForBranch();   // branch changed: re-fetch in the background
         this.Focus();
     }
@@ -176,7 +176,7 @@ public partial class MainWindow : Window
         LogToggleButton.Content = show ? "Hide log" : "Show log";
     }
 
-    private void OnToggleLog(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnToggleLog(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
     {
         ShowLog(!StatusLog.IsVisible);
     }
@@ -185,12 +185,12 @@ public partial class MainWindow : Window
 
     /// <summary>Rebuilds the Accounts menu on open: saved accounts (name + Steam/OTP/Trial
     /// tags, XIVLauncher.Core AccountSwitcher shape), then Add/Update, Remove, Remove All.</summary>
-    private int BuildAccountsMenu(ContextMenu cm)
+    private int BuildAccountsMenu(ContextMenu menu)
     {
-        cm.Items.Clear();
+        menu.Items.Clear();
 
         if (this.accounts.Accounts.Count == 0)
-            cm.Items.Add(new MenuItem { Header = "No saved accounts", IsEnabled = false });
+            menu.Items.Add(new MenuItem { Header = "No saved accounts", IsEnabled = false });
 
         foreach (var account in this.accounts.Accounts)
         {
@@ -202,10 +202,10 @@ public partial class MainWindow : Window
             var item = new MenuItem { Header = name };
             var captured = account;
             item.Click += (_, _) => SelectAccount(captured);
-            cm.Items.Add(item);
+            menu.Items.Add(item);
         }
 
-        cm.Items.Add(new Separator());
+        menu.Items.Add(new Separator());
 
         var add = new MenuItem { Header = "Add/Update Account" };
         add.Click += (_, _) =>
@@ -238,10 +238,10 @@ public partial class MainWindow : Window
             Report("All accounts removed");
         };
 
-        cm.Items.Add(add);
-        cm.Items.Add(remove);
-        cm.Items.Add(removeAll);
-        return cm.Items.Count;
+        menu.Items.Add(add);
+        menu.Items.Add(remove);
+        menu.Items.Add(removeAll);
+        return menu.Items.Count;
     }
 
     /// <summary>Menu pick: fill the login fields from the account (password comes from the
@@ -262,10 +262,10 @@ public partial class MainWindow : Window
         OtpCheck.IsChecked = account.UseOtp;
         SavePasswordCheck.IsChecked = account.SavePassword;
 
-        var s = this.settingsService.Settings;
-        s.Username = account.UserName;
-        s.SteamAccount = account.UseSteamServiceAccount;
-        s.FreeTrial = account.IsFreeTrial;
+        var settings = this.settingsService.Settings;
+        settings.Username = account.UserName;
+        settings.SteamAccount = account.UseSteamServiceAccount;
+        settings.FreeTrial = account.IsFreeTrial;
         this.settingsService.Save();
 
         if (saveAsCurrent)
@@ -314,7 +314,7 @@ public partial class MainWindow : Window
 
     // ---------- login ----------
 
-    private async void OnLogin(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnLogin(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
     {
         if (!await PrepareLoginFieldsAsync()) return;
         StartPipeline(this.settingsService.Settings.DalamudEnabled);
@@ -329,11 +329,11 @@ public partial class MainWindow : Window
     /// is never persisted (it changes every minute).</summary>
     private async Task<bool> PrepareLoginFieldsAsync()
     {
-        var s = this.settingsService.Settings;
-        s.Username = UsernameBox.Text;
-        s.Password = PasswordBox.Text;
-        s.SteamAccount = SteamAccountCheck.IsChecked == true;
-        s.FreeTrial = FreeTrialCheck.IsChecked == true;
+        var settings = this.settingsService.Settings;
+        settings.Username = UsernameBox.Text;
+        settings.Password = PasswordBox.Text;
+        settings.SteamAccount = SteamAccountCheck.IsChecked == true;
+        settings.FreeTrial = FreeTrialCheck.IsChecked == true;
 
         // OTP is a true/false setting; when enabled, a popup prompts for the 6-digit code
         // and the login proceeds only when its Login button is pressed (Cancel aborts).
@@ -346,14 +346,14 @@ public partial class MainWindow : Window
                 Report("Login cancelled (OTP popup)");
                 return false;
             }
-            s.OneTimePassword = code;
+            settings.OneTimePassword = code;
         }
         else
-            s.OneTimePassword = "";
+            settings.OneTimePassword = "";
 
         this.settingsService.Save();
 
-        PersistAccount(s.Username, s.Password, isOtp, s.SteamAccount, s.FreeTrial,
+        PersistAccount(settings.Username, settings.Password, isOtp, settings.SteamAccount, settings.FreeTrial,
             SavePasswordCheck.IsChecked == true, saveAsCurrent: true);
         return true;
     }
@@ -383,7 +383,7 @@ public partial class MainWindow : Window
     /// the button shows the special-launch menu at itself (Core's caret does the same).
     /// Each item fires the login pipeline with the matching modifier, using the login
     /// fields as they are — the same as pressing Login with that modifier.</summary>
-    private void OnTroubleshoot(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnTroubleshoot(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
     {
         // Same pattern as the Accounts menu: build items, then Open (Open() does not
         // raise Opening in Avalonia 12.1.4, and Click is an event, not settable).
@@ -431,17 +431,17 @@ public partial class MainWindow : Window
                 var (headlines, banners) = await svc.GetNewsAsync();
 
                 var bitmaps = new List<Bitmap>();
-                foreach (var b in banners)
+                foreach (var banner in banners)
                 {
-                    var bytes = await NewsHttp.GetByteArrayAsync(b.LsbBanner);
+                    var bytes = await NewsHttp.GetByteArrayAsync(banner.LsbBanner);
                     bitmaps.Add(await Dispatcher.UIThread.InvokeAsync(() => new Bitmap(new MemoryStream(bytes))));
                 }
 
                 Dispatcher.UIThread.Post(() => ShowNews(headlines, banners, bitmaps));
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                Log.Error(ex, "News load failed");
+                Log.Error(exception, "News load failed");
                 Dispatcher.UIThread.Post(() => NewsLoadingText.Text = "News unavailable");
             }
         });
@@ -475,12 +475,12 @@ public partial class MainWindow : Window
         }
 
         AddNewsCaption("News");
-        foreach (var n in headlines.News) AddNewsEntry(n.Title, n.Url);
+        foreach (var newsItem in headlines.News) AddNewsEntry(newsItem.Title, newsItem.Url);
 
         if (headlines.Topics.Length > 0)
         {
             AddNewsCaption("Topics");
-            foreach (var t in headlines.Topics) AddNewsEntry(t.Title, t.Url);
+            foreach (var topic in headlines.Topics) AddNewsEntry(topic.Title, topic.Url);
         }
     }
 
@@ -494,12 +494,12 @@ public partial class MainWindow : Window
         // News/Topics entries draw 1pt below the inherited default (12 -> 11), and
         // highlight with the theme accent on mouseover (cleared on exit, falling
         // back to the inherited Foreground).
-        var tb = new TextBlock { Text = title, FontSize = 11, TextWrapping = TextWrapping.Wrap, Cursor = new Cursor(StandardCursorType.Hand) };
+        var textBlock = new TextBlock { Text = title, FontSize = 11, TextWrapping = TextWrapping.Wrap, Cursor = new Cursor(StandardCursorType.Hand) };
         var accent = new SolidColorBrush((Color)Avalonia.Application.Current.FindResource("SystemAccentColor"));
-        tb.PointerEntered += (_, _) => tb.Foreground = accent;
-        tb.PointerExited += (_, _) => tb.ClearValue(TextBlock.ForegroundProperty);
-        tb.PointerPressed += (_, _) => OpenUrl(url);
-        NewsList.Children.Add(tb);
+        textBlock.PointerEntered += (_, _) => textBlock.Foreground = accent;
+        textBlock.PointerExited += (_, _) => textBlock.ClearValue(TextBlock.ForegroundProperty);
+        textBlock.PointerPressed += (_, _) => OpenUrl(url);
+        NewsList.Children.Add(textBlock);
     }
 
     private static void OpenUrl(string url)
@@ -508,9 +508,9 @@ public partial class MainWindow : Window
         {
             Process.Start(new ProcessStartInfo("xdg-open", url) { UseShellExecute = false });
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            Log.Error(ex, "Could not open {Url}", url);
+            Log.Error(exception, "Could not open {Url}", url);
         }
     }
 
@@ -581,8 +581,8 @@ public partial class MainWindow : Window
     /// CheckEnvBool, accepts only true/false and throws on 1).</summary>
     private static bool EnvBool(string var)
     {
-        var v = Environment.GetEnvironmentVariable(var);
-        return v is "1" || string.Equals(v, "true", StringComparison.OrdinalIgnoreCase);
+        var envValue = Environment.GetEnvironmentVariable(var);
+        return envValue is "1" || string.Equals(envValue, "true", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Killswitch gate (XIVLauncher.Core LauncherApp shape): when the server-published
@@ -700,7 +700,7 @@ public partial class MainWindow : Window
 
             loginButton.Click += (_, __) => TryLogin();
             cancelButton.Click += (_, __) => { tcs.TrySetResult(null); Dispatcher.UIThread.Post(() => window.Close()); };
-            codeBox.KeyDown += (_, e) => { if (e.Key == Key.Enter) TryLogin(); };
+            codeBox.KeyDown += (_, eventArgs) => { if (eventArgs.Key == Key.Enter) TryLogin(); };
 
             // Focus the code box on open so the user can type immediately.
             window.Opened += (_, __) => codeBox.Focus();
@@ -748,7 +748,7 @@ public partial class MainWindow : Window
         LoginService? service = null;
         try
         {
-            var s = this.settingsService.Settings;
+            var settings = this.settingsService.Settings;
             // Killswitch flags bitmask (XIVLauncher LeaseFeatureFlags): bit 0 = GlobalDisableDalamud,
             // launched without the in-game addon on patch days, regardless of the user setting.
             if ((flags & 1) != 0 && withDalamud)
@@ -759,12 +759,12 @@ public partial class MainWindow : Window
 
             Report($"Pipeline start (login, dalamud: {withDalamud})");
 
-            var prefixRoot = string.IsNullOrEmpty(s.PrefixPath)
+            var prefixRoot = string.IsNullOrEmpty(settings.PrefixPath)
                 ? this.settingsService.Root.FullName
-                : s.PrefixPath;
+                : settings.PrefixPath;
             Directory.CreateDirectory(prefixRoot);
 
-            var gamePath = new DirectoryInfo(s.GamePath);
+            var gamePath = new DirectoryInfo(settings.GamePath);
             var gameExe = new FileInfo(Path.Combine(gamePath.FullName, "game", "ffxiv_dx11.exe"));
             var gameInstalled = File.Exists(gameExe.FullName);
             Report($"Game location: {gamePath.FullName}");
@@ -779,7 +779,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var proton = s.ProtonPath;
+            var proton = settings.ProtonPath;
             if (string.IsNullOrEmpty(proton) || !Directory.Exists(proton))
             {
                 Report($"Proton path not found: {proton} — pick a Proton (default GE-Proton 11-6) under compatibilitytools.d; umu auto-select would upgrade a GE prefix, so launching is refused.");
@@ -789,12 +789,12 @@ public partial class MainWindow : Window
 
             // WINEDLLOVERRIDES: exact DXVK preset per the Enable DXVK setting, with the
             // user's extra overrides appended (joined with ';' when non-empty).
-            var dxvkPreset = s.EnableDxvk
+            var dxvkPreset = settings.EnableDxvk
                 ? "msquic=,mscoree=n,b;d3d9,d3d11,d3d10core,dxgi=n,b"
                 : "msquic=,mscoree=n,b;d3d9,d3d11,d3d10core,dxgi=b";
-            var winedllOverrides = string.IsNullOrEmpty(s.ExtraWineDllOverrides)
+            var winedllOverrides = string.IsNullOrEmpty(settings.ExtraWineDllOverrides)
                 ? dxvkPreset
-                : dxvkPreset + ";" + s.ExtraWineDllOverrides;
+                : dxvkPreset + ";" + settings.ExtraWineDllOverrides;
 
             // GE/Proton convention: WINEPREFIX is the compatdata ROOT, proton appends pfx/.
             // Steam runtime container mounts: only bind-mounted dirs are visible inside
@@ -848,7 +848,7 @@ public partial class MainWindow : Window
             File.WriteAllText(umuMarker, umuKey);
             Report("Prefix ready");
 
-            var lang = Enum.TryParse<ClientLanguage>(s.Language, out var l) ? l : ClientLanguage.English;
+            var lang = Enum.TryParse<ClientLanguage>(settings.Language, out var parsedLang) ? parsedLang : ClientLanguage.English;
             service = new LoginService(this.settingsService.Storage, this.settingsService.Settings.ConfigPath, prefix, lang, this.frontierUrl);
             Report($"Client language: {lang}");
 
@@ -893,7 +893,7 @@ public partial class MainWindow : Window
                 if (bootPatches.Length > 0)
                 {
                     await Dispatcher.UIThread.InvokeAsync(() => OpenProgressPopup("Installing boot patches"));
-                    var okBoot = await service.InstallPatchesAsync(Repository.Boot, bootPatches, string.Empty, s.GamePath, s.PatchPath, Report);
+                    var okBoot = await service.InstallPatchesAsync(Repository.Boot, bootPatches, string.Empty, settings.GamePath, settings.PatchPath, Report);
                     await Dispatcher.UIThread.InvokeAsync(() => CloseProgressPopup());
                     if (!okBoot)
                     {
@@ -902,8 +902,8 @@ public partial class MainWindow : Window
                     }
                 }
 
-                Report($"Install step 2: login with base game version report (steam: {s.SteamAccount}, free trial: {s.FreeTrial})");
-                var installResult = await service.LoginAsync(new LoginRequest { Username = s.Username, Password = s.Password, OneTimePassword = s.OneTimePassword, SteamAccount = s.SteamAccount, FreeTrial = s.FreeTrial }, gamePath, forceBaseVersion: true);
+                Report($"Install step 2: login with base game version report (steam: {settings.SteamAccount}, free trial: {settings.FreeTrial})");
+                var installResult = await service.LoginAsync(new LoginRequest { Username = settings.Username, Password = settings.Password, OneTimePassword = settings.OneTimePassword, SteamAccount = settings.SteamAccount, FreeTrial = settings.FreeTrial }, gamePath, forceBaseVersion: true);
                 Report($"Install login state: {installResult.State}");
                 if (installResult.State != XivGame.LoginState.NeedsPatchGame)
                 {
@@ -912,7 +912,7 @@ public partial class MainWindow : Window
                 }
 
                 await Dispatcher.UIThread.InvokeAsync(() => OpenProgressPopup("Installing game patches"));
-                var okAll = await service.InstallPatchesAsync(Repository.Ffxiv, installResult.PendingPatches, installResult.UniqueId ?? string.Empty, s.GamePath, s.PatchPath, Report);
+                var okAll = await service.InstallPatchesAsync(Repository.Ffxiv, installResult.PendingPatches, installResult.UniqueId ?? string.Empty, settings.GamePath, settings.PatchPath, Report);
                 await Dispatcher.UIThread.InvokeAsync(() => CloseProgressPopup());
                 if (!okAll)
                 {
@@ -926,7 +926,7 @@ public partial class MainWindow : Window
                     Report("Install complete — launch skipped (Patch without launching)");
                     return;
                 }
-                var launchSteam1 = s.SteamAccount && !s.IgnoreSteam;   // XIVLauncher.Core IsIgnoringSteam
+                var launchSteam1 = settings.SteamAccount && !settings.IgnoreSteam;   // XIVLauncher.Core IsIgnoringSteam
                 if (withDalamud)
                 {
                     if (!await WaitForDalamudAsync()) return;
@@ -937,8 +937,8 @@ public partial class MainWindow : Window
                 return;
             }
 
-            Report($"Logging in as {s.Username} (steam: {s.SteamAccount}, free trial: {s.FreeTrial})");
-            var result = await service.LoginAsync(new LoginRequest { Username = s.Username, Password = s.Password, OneTimePassword = s.OneTimePassword, SteamAccount = s.SteamAccount, FreeTrial = s.FreeTrial }, gamePath);
+            Report($"Logging in as {settings.Username} (steam: {settings.SteamAccount}, free trial: {settings.FreeTrial})");
+            var result = await service.LoginAsync(new LoginRequest { Username = settings.Username, Password = settings.Password, OneTimePassword = settings.OneTimePassword, SteamAccount = settings.SteamAccount, FreeTrial = settings.FreeTrial }, gamePath);
             Report($"Login state: {result.State}");
 
             if (result.State == XivGame.LoginState.Ok)
@@ -947,8 +947,8 @@ public partial class MainWindow : Window
                 // a successful login; the password is encrypted and stored only when the
                 // Save-password checkbox was on (flag captured on the UI thread). The OTP
                 // is not persisted.
-                PersistAccount(s.Username, s.Password, !string.IsNullOrEmpty(s.OneTimePassword),
-                    s.SteamAccount, s.FreeTrial, savePassword, saveAsCurrent: true);
+                PersistAccount(settings.Username, settings.Password, !string.IsNullOrEmpty(settings.OneTimePassword),
+                    settings.SteamAccount, settings.FreeTrial, savePassword, saveAsCurrent: true);
             }
 
             switch (result.State)
@@ -966,9 +966,9 @@ public partial class MainWindow : Window
                     Report($"Server returned {result.PendingPatches.Length} game patch(es)");
                     if (result.PendingPatches.Length > 0)
                         await Dispatcher.UIThread.InvokeAsync(() => OpenProgressPopup("Installing game patches"));
-                    var ok = await service.PatchAsync(result, s.GamePath, Report);
+                    var patchOk = await service.PatchAsync(result, settings.GamePath, Report);
                     await Dispatcher.UIThread.InvokeAsync(() => CloseProgressPopup());
-                    if (!ok)
+                    if (!patchOk)
                     {
                         Report("Patching stopped (cancelled from the progress popup, or failed) — game not launched.");
                         return;
@@ -983,7 +983,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var launchSteam = s.SteamAccount && !s.IgnoreSteam;   // XIVLauncher.Core IsIgnoringSteam
+            var launchSteam = settings.SteamAccount && !settings.IgnoreSteam;   // XIVLauncher.Core IsIgnoringSteam
             if (withDalamud)
             {
                 if (!await WaitForDalamudAsync()) return;
@@ -992,10 +992,10 @@ public partial class MainWindow : Window
             else
                 LaunchPlain(prefix, service, gamePath, result, lang, launchSteam);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            Log.Error(ex, "Login pipeline failed");
-            Dispatcher.UIThread.Post(() => StatusLog.Text += $"Launch failed: {ex.Message}\n");
+            Log.Error(exception, "Login pipeline failed");
+            Dispatcher.UIThread.Post(() => StatusLog.Text += $"Launch failed: {exception.Message}\n");
         }
         finally
         {
@@ -1015,12 +1015,12 @@ public partial class MainWindow : Window
         var gameRunner = new LinuxGameRunner(prefix, this.umuRunPath, WineLogPath, this.settingsService.Settings.WineDebugEnv);
         var game = new XivGame(new LinuxSteamStub(), new NullUniqueIdCache(), this.frontierUrl, "en");
 
-        var gs = this.settingsService.Settings;
+        var gameSettings = this.settingsService.Settings;
         var userPathWine = prefix.UnixToWinePath(service.GameConfigFolder().FullName);
         var extraArgs = $" UserPath={userPathWine}";
-        if (!string.IsNullOrWhiteSpace(gs.AdditionalArgs))
-            extraArgs += " " + gs.AdditionalArgs;   // regex-split by Launcher.LaunchGame
-        var dpi = Enum.TryParse<DpiAwareness>(gs.DpiAwareness, out var d) ? d : DpiAwareness.Unaware;
+        if (!string.IsNullOrWhiteSpace(gameSettings.AdditionalArgs))
+            extraArgs += " " + gameSettings.AdditionalArgs;   // regex-split by Launcher.LaunchGame
+        var dpi = Enum.TryParse<DpiAwareness>(gameSettings.DpiAwareness, out var parsedDpi) ? parsedDpi : DpiAwareness.Unaware;
         Report("LaunchGame (login session, encrypted args)");
         var proc = game.LaunchGame(gameRunner, result.UniqueId ?? string.Empty, result.OauthLogin!.Region,
             result.OauthLogin.MaxExpansion, isSteam, extraArgs, "",
