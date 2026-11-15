@@ -22,8 +22,8 @@ public sealed class DeckSecretProvider : ISecretProvider
 
     public DeckSecretProvider(SettingsService settings)
     {
-        deckFile = settings.GetFile("accounts.deck");
-        accountsDbFile = settings.GetFile("accounts.db");
+        deckFile = settings.GetConfigFile("accounts.deck");
+        accountsDbFile = settings.GetConfigFile("accounts.db");
 
         EnsureDeckSchema();
         MigrateCryptoFromAccountsDb();

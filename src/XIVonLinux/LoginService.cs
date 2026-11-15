@@ -33,6 +33,7 @@ public sealed class LoginService : IDisposable
 {
     private readonly Launcher launcher;
     private readonly Storage storage;
+    private readonly string patchCachePath;
     private readonly string configPath;
     private readonly UmuPrefix prefix;
     private readonly ClientLanguage language;
@@ -42,11 +43,12 @@ public sealed class LoginService : IDisposable
     /// the character-config folder path), not the settings object itself.
     /// frontierUrl is the launcher's frontier URL template (two format holes:
     /// lang, time) fetched from the launcher client config.</summary>
-    public LoginService(Storage storage, string configPath, UmuPrefix prefix, ClientLanguage language = ClientLanguage.English,
+    public LoginService(Storage storage, string configPath, string patchCachePath, UmuPrefix prefix, ClientLanguage language = ClientLanguage.English,
         string frontierUrl = "https://launcher.finalfantasyxiv.com/v740/index.html?rc_lang={0}&time={1}")
     {
         this.storage = storage;
         this.configPath = configPath;
+        this.patchCachePath = patchCachePath;
         this.prefix = prefix;
         this.language = language;
         this.launcher = new Launcher(new SteamworksSteam(), new NullUniqueIdCache(), frontierUrl, "en");
@@ -253,7 +255,7 @@ public sealed class LoginService : IDisposable
     public async Task<bool> PatchAsync(Launcher.LoginResult loginResult, string gameLocation, Action<string> status)
     {
         return await InstallPatchesAsync(Repository.Ffxiv, loginResult.PendingPatches,
-            loginResult.UniqueId ?? string.Empty, gameLocation, storage.GetFolder("patches").FullName, status);
+            loginResult.UniqueId ?? string.Empty, gameLocation, this.patchCachePath, status);
     }
 
     /// <summary>

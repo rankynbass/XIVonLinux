@@ -11,13 +11,16 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var storage = Path.Combine(home, ".xivonlinux");
-        Directory.CreateDirectory(storage);
+        // XDG layout: one-time move of the pre-XDG ~/.xivonlinux tree into
+        // ~/.config/~/.cache/~/.local/share under xivonlinux; must run before any
+        // storage root is opened so everything lands in the XDG dirs.
+        XdgStorage.MigrateFromLegacy();
+        var logsDir = Path.Combine(XdgStorage.DataRoot, "logs");
+        Directory.CreateDirectory(logsDir);
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
             .WriteTo.Console()
-            .WriteTo.File(Path.Combine(storage, "logs", "xivonlinux.log"))
+            .WriteTo.File(Path.Combine(logsDir, "xivonlinux.log"))
             .CreateLogger();
 
         var versionInfo = XIVonLinux.AppUtil.VersionInfo.Instance();

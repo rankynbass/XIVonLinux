@@ -72,7 +72,7 @@ public sealed class AccountManager
         }
     }
 
-    private FileInfo DbFile => this.settings.GetFile("accounts.db");
+    private FileInfo DbFile => this.settings.GetConfigFile("accounts.db");
 
     /// <summary>The account the launcher pre-selects: current_account in settings.toml,
     /// matched by username; falls back to the first saved account. The value is stored as
@@ -264,7 +264,7 @@ public sealed class AccountManager
     /// (numbered on collision) so it runs once.</summary>
     private void ImportLegacyToml(SqliteConnection conn)
     {
-        var legacy = this.settings.GetFile("accounts.toml");
+        var legacy = this.settings.GetConfigFile("accounts.toml");
         if (!File.Exists(legacy.FullName))
             return;
 

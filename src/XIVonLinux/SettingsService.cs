@@ -78,10 +78,16 @@ public sealed class LaunchSettings
 public sealed class SettingsService
 {
     private readonly Storage storage;
+    private readonly Storage configStorage;
+    private readonly Storage cacheStorage;
 
     public SettingsService()
     {
-        this.storage = new Storage("xivonlinux");
+        // XDG layout (XdgStorage): data root is the main storage, settings-era
+        // files ride in config, patches/temp downloads in cache.
+        this.storage = new Storage("xivonlinux", XdgStorage.DataRoot);
+        this.configStorage = new Storage("xivonlinux", XdgStorage.ConfigRoot);
+        this.cacheStorage = new Storage("xivonlinux", XdgStorage.CacheRoot);
         this.Settings = Load();
         ApplyDefaults();
         // Fresh copy on disk after missing/malformed/quarantined settings (and any
@@ -91,18 +97,24 @@ public sealed class SettingsService
 
     public LaunchSettings Settings { get; private set; }
 
-    /// <summary>The ~/.xivonlinux root, created on first use.</summary>
+    /// <summary>The data root (~/.local/share/xivonlinux), created on first use.</summary>
     public DirectoryInfo Root => this.storage.Root;
 
     /// <summary>The XIVLauncher.Common storage; passed to library services as values
     /// (GetFile/GetFolder), not as the settings object.</summary>
     public Storage Storage => this.storage;
 
-    /// <summary>A subfolder of ~/.xivonlinux, created if missing (e.g. "patches").</summary>
+    /// <summary>A subfolder of the data root, created if missing (prefixes, tools, logs).</summary>
     public DirectoryInfo GetFolder(string name) => this.storage.GetFolder(name);
 
-    /// <summary>A file path in ~/.xivonlinux (e.g. "aria2.log").</summary>
+    /// <summary>A file path in the data root (in-prefix logs, wine.log).</summary>
     public FileInfo GetFile(string name) => this.storage.GetFile(name);
+
+    /// <summary>A file in ~/.config/xivonlinux (settings.toml, accounts.db, accounts.deck).</summary>
+    public FileInfo GetConfigFile(string name) => this.configStorage.GetFile(name);
+
+    /// <summary>A subfolder of ~/.cache/xivonlinux, created if missing (patches).</summary>
+    public DirectoryInfo GetCacheFolder(string name) => this.cacheStorage.GetFolder(name);
 
     public void Save()
     {
@@ -149,14 +161,14 @@ public sealed class SettingsService
         if (!string.IsNullOrEmpty(this.Settings.CurrentAccountId))
             builder.AppendLine($"current_account = {TomlString(this.Settings.CurrentAccountId)}");
 
-        var file = this.storage.GetFile("settings.toml");
+        var file = this.configStorage.GetFile("settings.toml");
         File.WriteAllText(file.FullName, builder.ToString());
     }
 
     private LaunchSettings Load()
     {
         var settings = new LaunchSettings();
-        var file = this.storage.GetFile("settings.toml");
+        var file = this.configStorage.GetFile("settings.toml");
         if (!File.Exists(file.FullName))
             return settings;
 
@@ -266,7 +278,7 @@ public sealed class SettingsService
             this.Settings.GamePath = Path.Combine(home, "Games", "final-fantasy-xiv");
 
         if (string.IsNullOrEmpty(this.Settings.PatchPath))
-            this.Settings.PatchPath = this.storage.GetFolder("patches").FullName;
+            this.Settings.PatchPath = this.cacheStorage.GetFolder("patches").FullName;
 
         if (string.IsNullOrEmpty(this.Settings.ConfigPath))
             this.Settings.ConfigPath = this.storage.GetFolder("ffxivConfig").FullName;

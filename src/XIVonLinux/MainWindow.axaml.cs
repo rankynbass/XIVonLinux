@@ -141,13 +141,6 @@ public partial class MainWindow : Window
         RunDalamudUpdaterForBranch();   // fire-and-forget background check/download for the saved branch
 
         StartNewsLoad();
-
-        // Fake download test mode: opens the popup with 40 simulated patches (no
-        // network) so the 5-bar layout can be exercised without a real download.
-        // Deferred to Opened: the popup Show()s against this window as owner, which
-        // requires the main window to be shown first.
-        if (Environment.GetEnvironmentVariable("XIVON_FAKE_DOWNLOADS") == "1")
-            this.Opened += (_, __) => OpenProgressPopup("Installing game patches (fake test)", fakeMode: true);
     }
 
     // ---------- settings modal ----------
@@ -421,7 +414,8 @@ public partial class MainWindow : Window
     /// then shows them on the UI thread (NewsFrame shape from XIVLauncher.Core).
     private void StartNewsLoad()
     {
-        newsService = new LoginService(settingsService.Storage, settingsService.Settings.ConfigPath, null!, ClientLanguage.English, this.frontierUrl);
+        newsService = new LoginService(settingsService.Storage, settingsService.Settings.ConfigPath,
+            settingsService.GetCacheFolder("patches").FullName, null!, ClientLanguage.English, this.frontierUrl);
         var svc = newsService;
 
         _ = Task.Run(async () =>
@@ -718,7 +712,8 @@ public partial class MainWindow : Window
     // The popup lives in DownloadPopup.axaml(.cs): overall bar + 0-4 file bars,
     // rebuilt every second, auto-close when all downloads finish. These wrappers
     // show it against the main window as owner and close it on install completion.
-    // Fake test mode (XIVON_FAKE_DOWNLOADS=1) is exercised inside DownloadPopup.
+    // Fake test mode lives inside DownloadPopup (construct with fakeMode: true);
+    // no auto-launch hook — the popup is exercised by real installs.
 
     private DownloadPopup? progressPopup;
 
@@ -849,7 +844,8 @@ public partial class MainWindow : Window
             Report("Prefix ready");
 
             var lang = Enum.TryParse<ClientLanguage>(settings.Language, out var parsedLang) ? parsedLang : ClientLanguage.English;
-            service = new LoginService(this.settingsService.Storage, this.settingsService.Settings.ConfigPath, prefix, lang, this.frontierUrl);
+            service = new LoginService(this.settingsService.Storage, this.settingsService.Settings.ConfigPath,
+                this.settingsService.GetCacheFolder("patches").FullName, prefix, lang, this.frontierUrl);
             Report($"Client language: {lang}");
 
             Report("Checking login gate ...");
