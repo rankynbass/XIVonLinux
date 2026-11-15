@@ -13,8 +13,8 @@ namespace XIVonLinux;
 /// back to the deck provider.</summary>
 public sealed class KeychainSecretProvider : ISecretProvider
 {
-    public const string PACKAGE = "app.xivonlinux";
-    public const string SERVICE = "SEID";
+    private const string PACKAGE = "app.rankyn.xivonlinux";
+    private const string SERVICE = "FFXIV";
 
     public bool IsAvailable { get; }
 
