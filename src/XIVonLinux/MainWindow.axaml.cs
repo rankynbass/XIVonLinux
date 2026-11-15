@@ -309,6 +309,19 @@ public partial class MainWindow : Window
 
     private async void OnLogin(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        if (!await PrepareLoginFieldsAsync()) return;
+        StartPipeline(this.settingsService.Settings.DalamudEnabled);
+    }
+
+    /// <summary>Shared login preparation for the Login button AND the Troubleshoot menu
+    /// items: reads the fields, prompts the OTP popup when OTP is enabled (cancel
+    /// aborts), persists the account. Returns false when the OTP popup was cancelled.
+    /// XIVLauncher.Core persists the account at login time (MainPage.Login calls
+    /// PersistAccount before the OAuth request), so pressing Login once registers
+    /// the account in the account store; the Ok-path refreshes the password. The OTP
+    /// is never persisted (it changes every minute).</summary>
+    private async Task<bool> PrepareLoginFieldsAsync()
+    {
         var s = this.settingsService.Settings;
         s.Username = UsernameBox.Text;
         s.Password = PasswordBox.Text;
@@ -324,7 +337,7 @@ public partial class MainWindow : Window
             if (code is null)
             {
                 Report("Login cancelled (OTP popup)");
-                return;
+                return false;
             }
             s.OneTimePassword = code;
         }
@@ -333,23 +346,16 @@ public partial class MainWindow : Window
 
         this.settingsService.Save();
 
-        // XIVLauncher.Core persists the account at login time (MainPage.Login calls
-        // PersistAccount before the OAuth request), so pressing Login once registers
-        // the account in accounts.toml and the Accounts menu; the Ok-path refreshes
-        // the password. The OTP is never persisted (it changes every minute).
         PersistAccount(s.Username, s.Password, isOtp, s.SteamAccount, s.FreeTrial,
             SavePasswordCheck.IsChecked == true, saveAsCurrent: true);
-
-        // The login pipeline writes every step and every error into the log box;
-        // show it now so failures are visible as they happen.
-        ShowLog(true);
-
-        StartPipeline(s.DalamudEnabled);
+        return true;
     }
 
     /// <summary>Fires the login pipeline. While a game is up, launches are refused
-    /// (shared prefix is single-instance) rather than stacked.</summary>
-    private void StartPipeline(bool withDalamud)
+    /// (shared prefix is single-instance) rather than stacked. The modifiers mirror
+    /// XIVLauncher.Core's LoginAction menu: noPlugins/noThirdPlugins go to the
+    /// injector, noLaunch stops after patching.</summary>
+    private void StartPipeline(bool withDalamud, bool noPlugins = false, bool noThirdPlugins = false, bool noLaunch = false)
     {
         if (activeLaunches > 0)
         {
@@ -360,7 +366,36 @@ public partial class MainWindow : Window
         // must not touch the checkbox directly.
         var savePassword = SavePasswordCheck.IsChecked == true;
         LoginButton.IsEnabled = false;
-        _ = Task.Run(() => RunLoginPipelineAsync(withDalamud, savePassword));
+        // The login pipeline writes every step and every error into the log box;
+        // show it now so failures are visible as they happen (menu items too).
+        ShowLog(true);
+        _ = Task.Run(() => RunLoginPipelineAsync(withDalamud, savePassword, noPlugins, noThirdPlugins, noLaunch));
+    }
+
+    /// <summary>Troubleshoot dropdown in XIVLauncher.Core's LoginAction menu format:
+    /// the button shows the special-launch menu at itself (Core's caret does the same).
+    /// Each item fires the login pipeline with the matching modifier, using the login
+    /// fields as they are — the same as pressing Login with that modifier.</summary>
+    private void OnTroubleshoot(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        // Same pattern as the Accounts menu: build items, then Open (Open() does not
+        // raise Opening in Avalonia 12.1.4, and Click is an event, not settable).
+        // Each item runs the FULL login preparation (OTP popup when enabled) before
+        // firing the pipeline with its modifier — the same as pressing Login.
+        var menu = new ContextMenu();
+        var noD = new MenuItem { Header = "Launch without Dalamud" };
+        noD.Click += async (_, __) => { if (await PrepareLoginFieldsAsync()) StartPipeline(false); };
+        var noP = new MenuItem { Header = "Launch without plugins" };
+        noP.Click += async (_, __) => { if (await PrepareLoginFieldsAsync()) StartPipeline(true, true); };
+        var noT = new MenuItem { Header = "Launch without third-party plugins" };
+        noT.Click += async (_, __) => { if (await PrepareLoginFieldsAsync()) StartPipeline(true, false, true); };
+        var noL = new MenuItem { Header = "Patch without launching" };
+        noL.Click += async (_, __) => { if (await PrepareLoginFieldsAsync()) StartPipeline(true, false, false, true); };
+        menu.Items.Add(noD);
+        menu.Items.Add(noP);
+        menu.Items.Add(noT);
+        menu.Items.Add(noL);
+        menu.Open((Control)sender!);
     }
 
     /// <summary>Log to Serilog (console/file) and mirror the line into the UI status box.</summary>
@@ -792,7 +827,7 @@ public partial class MainWindow : Window
     /// The WINEPREFIX root comes from settings.PrefixPath (default ~/.xivonlinux),
     /// so prefix, settings and dalamud data all live under ~/.xivonlinux.
     /// </summary>
-    private async Task RunLoginPipelineAsync(bool withDalamud, bool savePassword)
+    private async Task RunLoginPipelineAsync(bool withDalamud, bool savePassword, bool noPlugins, bool noThirdPlugins, bool noLaunch)
     {
         LoginService? service = null;
         try
@@ -846,15 +881,23 @@ public partial class MainWindow : Window
                 : dxvkPreset + ";" + s.ExtraWineDllOverrides;
 
             // GE/Proton convention: WINEPREFIX is the compatdata ROOT, proton appends pfx/.
+            // Steam runtime container mounts: only bind-mounted dirs are visible inside
+            // the prefix, so the config folder (UserPath) must be mounted explicitly.
+            // When the game lived on the /games drive, the whole drive was mounted and
+            // config came along for free; with the game elsewhere, config needs its own.
+            var configMount = this.settingsService.Settings.ConfigPath.TrimEnd(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            Directory.CreateDirectory(configMount);
+            var compatMounts = string.IsNullOrEmpty(configMount) ? gamePath.FullName : gamePath.FullName + ":" + configMount;
             var prefix = new UmuPrefix(
                 new DirectoryInfo(Path.Combine(prefixRoot, "pfx")),
                 prefixRoot,
                 gamePath.FullName,
                 "umu-steam",
                 proton,
-                gamePath.FullName,
+                compatMounts,
                 winedllOverrides);
             Report($"Prefix root: {prefixRoot}");
+            Report($"STEAM_COMPAT_MOUNTS: {compatMounts}");
             Report($"WINEDLLOVERRIDES: {winedllOverrides}");
 
             // Managed umu-launcher: keep latest + previous zipapp in tools/umu, use the
@@ -962,11 +1005,16 @@ public partial class MainWindow : Window
                 }
 
                 Report($"Install complete: game ver {Repository.Ffxiv.GetVer(gamePath)}");
+                if (noLaunch)
+                {
+                    Report("Install complete — launch skipped (Patch without launching)");
+                    return;
+                }
                 var launchSteam1 = s.SteamAccount && !s.IgnoreSteam;   // XIVLauncher.Core IsIgnoringSteam
                 if (withDalamud)
                 {
                     if (!await WaitForDalamudAsync()) return;
-                    LaunchWithDansharing(prefix, service, gameExe, gamePath, installResult, lang, launchSteam1);
+                    LaunchWithDansharing(prefix, service, gameExe, gamePath, installResult, lang, launchSteam1, noPlugins, noThirdPlugins);
                 }
                 else
                     LaunchPlain(prefix, service, gamePath, installResult, lang, launchSteam1);
@@ -1013,11 +1061,17 @@ public partial class MainWindow : Window
                     break;
             }
 
+            if (noLaunch)
+            {
+                Report("Login + patch complete — launch skipped (Patch without launching)");
+                return;
+            }
+
             var launchSteam = s.SteamAccount && !s.IgnoreSteam;   // XIVLauncher.Core IsIgnoringSteam
             if (withDalamud)
             {
                 if (!await WaitForDalamudAsync()) return;
-                LaunchWithDansharing(prefix, service, gameExe, gamePath, result, lang, launchSteam);
+                LaunchWithDansharing(prefix, service, gameExe, gamePath, result, lang, launchSteam, noPlugins, noThirdPlugins);
             }
             else
                 LaunchPlain(prefix, service, gamePath, result, lang, launchSteam);
@@ -1113,7 +1167,7 @@ public partial class MainWindow : Window
     /// encrypted game args (session, region, expansion, ver, UserPath); Run returns
     /// as soon as the injector's JSON arrives (game is up); game exit is watched
     /// off the UI thread.</summary>
-    private void LaunchWithDansharing(UmuPrefix prefix, LoginService service, FileInfo gameExe, DirectoryInfo gamePath, XivGame.LoginResult result, ClientLanguage lang, bool isSteam)
+    private void LaunchWithDansharing(UmuPrefix prefix, LoginService service, FileInfo gameExe, DirectoryInfo gamePath, XivGame.LoginResult result, ClientLanguage lang, bool isSteam, bool noPlugins, bool noThirdPlugins)
     {
         var injectorExe = this.dalamudUpdater.Runner;
         if (this.settingsService.Settings.ManualInjectEnabled)
@@ -1173,7 +1227,7 @@ public partial class MainWindow : Window
         };
         Report($"In-prefix injector: SE login session + {loadMethod} + delay {startInfo.DelayInitializeMs}ms");
         var runner = new LinuxDalamudRunner(prefix, this.umuRunPath, WineLogPath, this.settingsService.Settings.WineDebugEnv);
-        var proc = runner.Run(injectorExe, false, false, false, gameExe, gameArgs, "", env,
+        var proc = runner.Run(injectorExe, false, noPlugins, noThirdPlugins, gameExe, gameArgs, "", env,
             loadMethod, startInfo);
 
         if (proc is null)

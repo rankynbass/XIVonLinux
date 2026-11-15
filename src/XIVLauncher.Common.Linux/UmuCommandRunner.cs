@@ -127,6 +127,9 @@ public sealed class UmuCommandRunner
         foreach (var kv in merged)
             psi.EnvironmentVariables[kv.Key] = kv.Value;
 
+        if (merged.TryGetValue("STEAM_COMPAT_MOUNTS", out var spawnMounts))
+            Log.Information("Spawn env STEAM_COMPAT_MOUNTS: {Mounts}", spawnMounts);
+
         Log.Verbose("umu-run: {FileName} {Arguments}", psi.FileName, BuildArgLine(psi));
         var p = new Process { StartInfo = psi };
         p.Start();

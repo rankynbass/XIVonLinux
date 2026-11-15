@@ -70,6 +70,12 @@ public sealed class UmuPrefix
             env["PROTONPATH"] = ProtonPath;
         if (!string.IsNullOrEmpty(SteamCompatMounts))
             env["STEAM_COMPAT_MOUNTS"] = SteamCompatMounts;
+        // umu overwrites STEAM_COMPAT_MOUNTS with its tool paths at spawn (umu_run.py:298).
+        // Extra directories ride in PRESSURE_VESSEL_FILESYSTEMS_RW (colon-separated,
+        // Linux standard), the stable pressure-vessel interface: bind-mounted read-write
+        // into the container without touching umu's own mount machinery.
+        if (!string.IsNullOrEmpty(SteamCompatMounts))
+            env["PRESSURE_VESSEL_FILESYSTEMS_RW"] = SteamCompatMounts;
         if (!string.IsNullOrEmpty(WineDllOverrides))
             env["WINEDLLOVERRIDES"] = WineDllOverrides;
         return env;

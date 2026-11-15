@@ -29,6 +29,7 @@
                         <CheckBox Content="Save password" Name="SavePasswordCheck" Margin="0,2,0,0" />
                         <Button Content="Login" Name="LoginButton" Click="OnLogin" Margin="0,12,0,0" />
                         <Button Content="Accounts" Name="AccountsButton" Margin="0,8,0,0" />
+                        <Button Content="Troubleshoot" Name="TroubleshootButton" Click="OnTroubleshoot" Margin="0,8,0,0" />
                     </StackPanel>
                 </ScrollViewer>
             </Border>
