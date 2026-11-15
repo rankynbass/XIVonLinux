@@ -68,6 +68,14 @@ if (args.Length > 0 && args[0] == "envtest")
     }
     return;
 }
+if (args.Length > 0 && args[0] == "settings")
+{
+    var s = new SettingsService();
+    Console.WriteLine($"wine_debug_enabled read back as: {s.Settings.WineDebugEnabled}");
+    Console.WriteLine($"wine_debug_value: {s.Settings.WineDebugValue}");
+    Console.WriteLine($"WineDebugEnv resolves to: {s.Settings.WineDebugEnv}");
+    return;
+}
 var settings = new SettingsService();
 XIVonLinux.Program.InstallAria2Shim();   // PATH shim + XIVON_* env, same as app startup
 Console.WriteLine($"PATH head: {(Environment.GetEnvironmentVariable("PATH") ?? "").Split(':')[0]}");

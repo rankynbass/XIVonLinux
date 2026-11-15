@@ -333,7 +333,7 @@ public sealed class SettingsService
         if (Get(proton, "umu_path", "umu_path") is string umuPath) settings.UmuPath = umuPath;
         settings.EnableDxvk = GetBool(proton, "enable_dxvk", "enable_dxvk", settings.EnableDxvk);
         if (Get(proton, "extra_wine_dll_overrides", "extra_wine_dll_overrides") is string wineDllOverrides) settings.ExtraWineDllOverrides = wineDllOverrides;
-        if (Get(proton, "wine_debug_enabled", "wine_debug_enabled") is string wde) settings.WineDebugEnabled = wde == "true";
+        settings.WineDebugEnabled = GetBool(proton, "wine_debug_enabled", "wine_debug_enabled", settings.WineDebugEnabled);
         if (Get(proton, "wine_debug_value", "wine_debug_value") is string wdv)
             settings.WineDebugValue = string.IsNullOrWhiteSpace(wdv) ? LaunchSettings.DefaultWineDebugValue : wdv;
 
