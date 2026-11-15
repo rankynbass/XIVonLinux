@@ -45,6 +45,9 @@ public partial class SettingsWindow : Window
         PrefixPathBox.Text = s.PrefixPath;
         DxvkCheck.IsChecked = s.EnableDxvk;
         ExtraWineDllOverridesBox.Text = s.ExtraWineDllOverrides;
+        WineDebugCheck.IsChecked = s.WineDebugEnabled;
+        WineDebugBox.Text = string.IsNullOrWhiteSpace(s.WineDebugValue) ? LaunchSettings.DefaultWineDebugValue : s.WineDebugValue;
+        WineDebugBox.IsEnabled = WineDebugCheck.IsChecked == true;
         LanguageCombo.Items.Add("English");
         LanguageCombo.Items.Add("Japanese");
         LanguageCombo.Items.Add("German");
@@ -153,6 +156,11 @@ public partial class SettingsWindow : Window
 
     private void OnManagedUmuToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => ApplyUmuMode(ManagedUmuCheck.IsChecked == true);
+
+    /// <summary>The WINEDEBUG value box edits only while logging is enabled; when
+    /// disabled, launches force WINEDEBUG=-all.</summary>
+    private void OnWineDebugToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => WineDebugBox.IsEnabled = WineDebugCheck.IsChecked == true;
 
     private void OnUmuCombo(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
@@ -361,6 +369,9 @@ public partial class SettingsWindow : Window
         s.PrefixPath = PrefixPathBox.Text;
         s.EnableDxvk = DxvkCheck.IsChecked == true;
         s.ExtraWineDllOverrides = ExtraWineDllOverridesBox.Text;
+        s.WineDebugEnabled = WineDebugCheck.IsChecked == true;
+        s.WineDebugValue = string.IsNullOrWhiteSpace(WineDebugBox.Text)
+            ? LaunchSettings.DefaultWineDebugValue : WineDebugBox.Text;
         s.DalamudEnabled = DalamudCheck.IsChecked == true;
 
         // Dalamud tab: load method name, delay, branch, manual injector path.

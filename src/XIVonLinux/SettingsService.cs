@@ -38,6 +38,15 @@ public sealed class LaunchSettings
     public string UmuPath { get; set; } = "";         // custom mode: folder on disk containing umu-run
     public bool EnableDxvk { get; set; } = true;       // DXVK preset for WINEDLLOVERRIDES
     public string ExtraWineDllOverrides { get; set; } = ""; // appended after the DXVK preset
+    public bool WineDebugEnabled { get; set; } = true; // false forces WINEDEBUG=-all
+    public string WineDebugValue { get; set; } = DefaultWineDebugValue; // classes when enabled; blank restores default
+
+    /// <summary>Wine debug classes for in-prefix launches: -all when WINEDEBUG is
+    /// disabled, the configured value when enabled; a blank value restores the default.</summary>
+    public string WineDebugEnv => !WineDebugEnabled ? "-all"
+        : string.IsNullOrWhiteSpace(WineDebugValue) ? DefaultWineDebugValue : WineDebugValue;
+
+    public const string DefaultWineDebugValue = "+warn,+overlay,fixme-all";
 
     // Dalamud tab
     public bool DalamudEnabled { get; set; } = true;
@@ -121,6 +130,8 @@ public sealed class SettingsService
         sb.AppendLine($"umu_path = {TomlString(this.Settings.UmuPath)}");
         sb.AppendLine($"enable_dxvk = {this.Settings.EnableDxvk.ToString().ToLowerInvariant()}");
         sb.AppendLine($"extra_wine_dll_overrides = {TomlString(this.Settings.ExtraWineDllOverrides)}");
+        sb.AppendLine($"wine_debug_enabled = {this.Settings.WineDebugEnabled.ToString().ToLowerInvariant()}");
+        sb.AppendLine($"wine_debug_value = {TomlString(this.Settings.WineDebugValue)}");
         sb.AppendLine();
 
         sb.AppendLine("[dalamud]");
@@ -223,6 +234,9 @@ public sealed class SettingsService
         if (Get(proton, "umu_path", "umu_path") is string up) s.UmuPath = up;
         s.EnableDxvk = GetBool(proton, "enable_dxvk", "enable_dxvk", s.EnableDxvk);
         if (Get(proton, "extra_wine_dll_overrides", "extra_wine_dll_overrides") is string xw) s.ExtraWineDllOverrides = xw;
+        if (Get(proton, "wine_debug_enabled", "wine_debug_enabled") is string wde) s.WineDebugEnabled = wde == "true";
+        if (Get(proton, "wine_debug_value", "wine_debug_value") is string wdv)
+            s.WineDebugValue = string.IsNullOrWhiteSpace(wdv) ? LaunchSettings.DefaultWineDebugValue : wdv;
 
         s.DalamudEnabled = GetBool(dalamud, "enabled", "dalamud_enabled", s.DalamudEnabled);
         if (Get(dalamud, "branch_key", "branch_key") is string bk) s.BranchKey = bk;

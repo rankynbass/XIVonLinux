@@ -66,7 +66,7 @@
             </TabItem>
 
             <TabItem Header="Proton">
-                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,12,0,0">
+                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,12,0,0">
                     <!-- Custom = folder pick (Proton row + Browse); managed = pick from the
                          enumerated Proton list (compatibilitytools.d, steamapps/common, tools/proton).
                          Combo occupies the same row as the Proton textbox — swapping in place,
@@ -100,6 +100,12 @@
 
                     <TextBlock Grid.Row="6" Grid.Column="0" Text="Extra Wine DLL Overrides" VerticalAlignment="Center" Margin="0,0,12,6" />
                     <TextBox Grid.Row="6" Grid.Column="1" Name="ExtraWineDllOverridesBox" Margin="0,0,8,6" />
+
+                    <CheckBox Grid.Row="7" Grid.Column="1" Content="Enable WINEDEBUG logging" Name="WineDebugCheck"
+                              HorizontalAlignment="Left" Margin="0,0,0,6" IsChecked="True" IsCheckedChanged="OnWineDebugToggled" />
+
+                    <TextBlock Grid.Row="8" Grid.Column="0" Text="WINEDEBUG value" VerticalAlignment="Center" Margin="0,0,12,6" />
+                    <TextBox Grid.Row="8" Grid.Column="1" Name="WineDebugBox" Margin="0,0,8,6" />
                 </Grid>
             </TabItem>
 
