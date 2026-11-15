@@ -35,7 +35,7 @@ Changes and additions to Settings window
 
 ### Troubleshooting
 * [DONE 2026-11-15 13:56 PT via bb9e57e, 2a79eff] Add a troubleshooting tab with hacks from XIVLauncher.Core. Priority: Low
-* Generate tspacks from here. Priority: Low
+* [DONE 2026-11-15 14:46 PT via 29db19a] Generate tspacks from here. Priority: Low
 
 ## Main Page fixes
 Changes to the main page
