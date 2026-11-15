@@ -4,24 +4,36 @@ using System.Security.Cryptography;
 namespace XIVonLinux;
 
 /// <summary>Per-account AES-CBC (256-bit key, 128-bit IV) obfuscation of saved
-/// passwords. NOT security hardening — the key lives next to the ciphertext on the
-/// same disk; it is obfuscation so the password is never stored as plain text
-/// (Alex's rule). Each account gets its own unique key + vector generated once at
-/// registration (GenerateEncryptionKey/GenerateEncryptionVector), stored as hex
-/// strings in the accounts table; SimpleAES is constructed per account from those
-/// strings. Ciphertext is hex-encoded. The original snippet's hardcoded
-/// Key/Vector fields and the 3-digit-padded URL encoding are removed.</summary>
+/// passwords. NOT security hardening — it is obfuscation so the password is never
+/// stored as plain text (Alex's rule). The key + vector are DERIVED from the
+/// username: SHA-512 of the username gives 128 hex chars; the first 64 are the
+/// AES-256 key, the last 32 the IV (Alex's rule 2026-11-14). Nothing crypto is
+/// stored in accounts.deck beyond the ciphertext — the key material is recreated
+/// on the fly from the username, so the deck file alone does not reveal it.
+/// (Note: usernames are visible in accounts.db, so anyone with both files can
+/// rebuild the key; this raises the bar, not over the wall.) Ciphertext is
+/// hex-encoded. The original snippet's hardcoded Key/Vector fields and the
+/// 3-digit-padded URL encoding are removed.</summary>
 public sealed class SimpleAES
 {
     private readonly byte[] key;
     private readonly byte[] vector;
 
-    /// <summary>keyHex/vectorHex are the hex strings produced from
-    /// GenerateEncryptionKey()/GenerateEncryptionVector() via Convert.ToHexString.</summary>
+    /// <summary>keyHex/vectorHex are hex strings (64 and 32 chars), e.g. produced
+    /// by DeriveFromUsername or GenerateEncryptionKey/Vector + Convert.ToHexString.</summary>
     public SimpleAES(string keyHex, string vectorHex)
     {
         key = Convert.FromHexString(keyHex);
         vector = Convert.FromHexString(vectorHex);
+    }
+
+    /// <summary>Derives the per-account key + IV from the username: SHA-512 hex
+    /// (128 chars), first 64 chars = key, last 32 chars = IV. Deterministic — the
+    /// same username always yields the same key material.</summary>
+    public static (string KeyHex, string VectorHex) DeriveFromUsername(string username)
+    {
+        var hash = Convert.ToHexString(SHA512.HashData(System.Text.Encoding.UTF8.GetBytes(username)));
+        return (hash[..64], hash[^32..]);
     }
 
     /// <summary>Generates a 32-byte (256-bit) AES key. Convert with

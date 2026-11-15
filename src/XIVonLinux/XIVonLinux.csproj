@@ -49,6 +49,7 @@
              restores at 2.1.11 and is flagged. -->
         <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.1" />
         <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.14" />
+        <PackageReference Include="KeySharp" Version="1.0.5" />
     </ItemGroup>
 
 </Project>

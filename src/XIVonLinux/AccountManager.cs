@@ -11,28 +11,68 @@ namespace XIVonLinux;
 
 /// <summary>Loads/saves accounts.db (SQLite) with one accounts table keyed by
 /// user_name PRIMARY KEY — usernames are unique, so there are never two accounts
-/// named "test" (Alex's rule). The password side lives in a separate file,
-/// accounts.deck: one row per user_name carrying that user's unique AES key + IV
-/// (hex strings, generated once per user) and the password ciphertext, stored
-/// hex-encoded only when save_password is on; lookups key on user_name. Crash-proof:
-/// a corrupt accounts.db/accounts.deck is quarantined as .bad (numbered on collision)
-/// and recreated empty — same shape as settings.toml. A legacy accounts.toml from the
-/// pre-SQLite era is imported once on first run, first entry wins per username, then
-/// renamed accounts.toml.imported.</summary>
+/// named "test" (Alex's rule). Account flags only live in accounts.db; passwords
+/// go through exactly one ISecretProvider backend (SecretProvider): the OS
+/// keyring (KeychainSecretProvider, no encryption — the service protects
+/// entries) or the encrypted accounts.deck file (DeckSecretProvider). Keyring
+/// and deck are ALTERNATIVES — keyring does not work with the deck, which is
+/// why the deck exists: when no org.freedesktop.secrets service answers the
+/// dummy probe, the launcher falls back to the deck. XL_SECRET_PROVIDER env
+/// selects KEYRING (default) / FILE / NONE. Crash-proof: a corrupt accounts.db
+/// is quarantined as .bad (numbered on collision) and recreated empty — same
+/// shape as settings.toml. A legacy accounts.toml from the pre-SQLite era is
+/// imported once on first run, first entry wins per username, then renamed
+/// accounts.toml.imported.</summary>
 public sealed class AccountManager
 {
     public ObservableCollection<XivAccount> Accounts { get; private set; } = new();
 
     private readonly SettingsService settings;
 
+    /// <summary>The active password backend (keyring, deck, or dummy).</summary>
+    public ISecretProvider SecretProvider { get; }
+
     public AccountManager(SettingsService settings)
     {
         this.settings = settings;
+        this.SecretProvider = CreateSecretProvider(settings);
         Load();
     }
 
+    /// <summary>Selects the password backend. Default: keyring, falling back to
+    /// the deck when the secret service is unavailable (Alex's rule: keychain
+    /// and deck are alternatives). XL_SECRET_PROVIDER=KEYRING|FILE|NONE overrides.</summary>
+    private static ISecretProvider CreateSecretProvider(SettingsService settings)
+    {
+        var choice = (Environment.GetEnvironmentVariable("XL_SECRET_PROVIDER") ?? "KEYRING").ToUpperInvariant();
+
+        switch (choice)
+        {
+            case "KEYRING":
+                var keyring = new KeychainSecretProvider();
+                if (keyring.IsAvailable)
+                {
+                    Log.Information("Password backend: keyring");
+                    return keyring;
+                }
+
+                Log.Warning("No org.freedesktop.secrets provider available; falling back to the deck backend");
+                return new DeckSecretProvider(settings);
+
+            case "FILE":
+                Log.Information("Password backend: deck (file)");
+                return new DeckSecretProvider(settings);
+
+            case "NONE":
+                Log.Warning("Password backend: none — saved passwords will not persist");
+                return new DummySecretProvider();
+
+            default:
+                throw new ArgumentException($"Invalid secret provider: {choice}");
+        }
+    }
+
     private FileInfo DbFile => this.settings.GetFile("accounts.db");
-    private FileInfo DeckFile => this.settings.GetFile("accounts.deck");
 
     /// <summary>The account the launcher pre-selects: current_account in settings.toml,
     /// matched by username; falls back to the first saved account. The value is stored as
@@ -89,22 +129,16 @@ public sealed class AccountManager
 
     public void RemoveAllAccounts()
     {
+        foreach (var acc in this.Accounts)
+            this.SecretProvider.DeletePassword(acc.UserName);
+
         this.Accounts.Clear();
         this.settings.Settings.CurrentAccountId = null;
 
-        using (var conn = OpenDb())
-        {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "DELETE FROM accounts;";
-            cmd.ExecuteNonQuery();
-        }
-
-        using (var deck = OpenDeckDb())
-        {
-            using var d = deck.CreateCommand();
-            d.CommandText = "DELETE FROM passwords;";
-            d.ExecuteNonQuery();
-        }
+        using var conn = OpenDb();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM accounts;";
+        cmd.ExecuteNonQuery();
     }
 
     public void UpdateFreeTrial(XivAccount account, bool freeTrial)
@@ -136,91 +170,10 @@ public sealed class AccountManager
         return conn;
     }
 
-    /// <summary>accounts.deck: the password side of the store, separate from the
-    /// account flags. One row per user_name (PRIMARY KEY) with that user's unique
-    /// AES key, IV, and the hex-encoded password ciphertext. Lookups key on
-    /// user_name, so the current account's password is found by username.</summary>
-    private SqliteConnection OpenDeckDb()
-    {
-        var file = DeckFile;
-        var conn = new SqliteConnection($"Data Source={file.FullName}");
-        conn.Open();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText =
-            "CREATE TABLE IF NOT EXISTS passwords (" +
-            "user_name TEXT PRIMARY KEY, " +
-            "aes_key TEXT NOT NULL DEFAULT '', " +
-            "aes_vector TEXT NOT NULL DEFAULT '', " +
-            "encrypted_password TEXT NOT NULL DEFAULT '');";
-        cmd.ExecuteNonQuery();
-        return conn;
-    }
-
-    /// <summary>One-time migration from the intermediate layout where the crypto
-    /// columns lived inside accounts.db: copy any populated rows into accounts.deck
-    /// (INSERT OR IGNORE — an existing deck row wins), then DROP the columns. If the
-    /// drop fails the columns stay (harmless); the data is already migrated.</summary>
-    private void MigrateCryptoToDeck(SqliteConnection accountsConn)
-    {
-        var cols = new HashSet<string>();
-        using (var c = accountsConn.CreateCommand())
-        {
-            c.CommandText = "SELECT name FROM pragma_table_info('accounts');";
-            using var r = c.ExecuteReader();
-            while (r.Read())
-                cols.Add(r.GetString(0));
-        }
-        if (!cols.Contains("aes_key"))
-            return;
-
-        using var deck = OpenDeckDb();
-        using (var copy = accountsConn.CreateCommand())
-        {
-            copy.CommandText = "SELECT user_name, aes_key, aes_vector, encrypted_password " +
-                "FROM accounts WHERE aes_key <> '' OR aes_vector <> '' OR encrypted_password <> ''";
-            using var r = copy.ExecuteReader();
-            while (r.Read())
-            {
-                using var ins = deck.CreateCommand();
-                ins.CommandText = "INSERT OR IGNORE INTO passwords (user_name, aes_key, aes_vector, encrypted_password)" +
-                    " VALUES ($u, $k, $v, $p);";
-                ins.Parameters.AddWithValue("$u", r.GetString(0));
-                ins.Parameters.AddWithValue("$k", r.GetString(1));
-                ins.Parameters.AddWithValue("$v", r.GetString(2));
-                ins.Parameters.AddWithValue("$p", r.GetString(3));
-                ins.ExecuteNonQuery();
-            }
-        }
-
-        foreach (var col in new[] { "aes_key", "aes_vector", "encrypted_password" })
-        {
-            try
-            {
-                using var a = accountsConn.CreateCommand();
-                a.CommandText = $"ALTER TABLE accounts DROP COLUMN {col};";
-                a.ExecuteNonQuery();
-            }
-            catch (SqliteException ex)
-            {
-                Log.Warning(ex, "Could not drop {Col} from accounts.db; the data is already in accounts.deck", col);
-            }
-        }
-        Log.Information("Migrated account password crypto data from accounts.db into accounts.deck");
-    }
-
     private void PersistRow(XivAccount a, bool ignore = false)
     {
-        if (string.IsNullOrEmpty(a.AesKey))
-            a.AesKey = Convert.ToHexString(SimpleAES.GenerateEncryptionKey());
-        if (string.IsNullOrEmpty(a.AesVector))
-            a.AesVector = Convert.ToHexString(SimpleAES.GenerateEncryptionVector());
-
-        var encrypted = a.SavePassword && !string.IsNullOrEmpty(a.Password)
-            ? new SimpleAES(a.AesKey, a.AesVector).EncryptToString(a.Password)
-            : "";
-
-        // Account flags stay in accounts.db; the crypto row (user_name + key + IV +
-        // ciphertext) lives in accounts.deck, keyed by user_name.
+        // Account flags stay in accounts.db; the password goes through the active
+        // secret provider (keyring / deck / dummy).
         using (var conn = OpenDb())
         {
             using var cmd = conn.CreateCommand();
@@ -240,19 +193,10 @@ public sealed class AccountManager
             cmd.ExecuteNonQuery();
         }
 
-        using (var deck = OpenDeckDb())
-        {
-            using var d = deck.CreateCommand();
-            d.CommandText =
-                (ignore ? "INSERT OR IGNORE INTO passwords" : "INSERT OR REPLACE INTO passwords") +
-                " (user_name, aes_key, aes_vector, encrypted_password)" +
-                " VALUES ($user_name, $aes_key, $aes_vector, $encrypted_password);";
-            d.Parameters.AddWithValue("$user_name", a.UserName);
-            d.Parameters.AddWithValue("$aes_key", a.AesKey);
-            d.Parameters.AddWithValue("$aes_vector", a.AesVector);
-            d.Parameters.AddWithValue("$encrypted_password", encrypted);
-            d.ExecuteNonQuery();
-        }
+        if (a.SavePassword && !string.IsNullOrEmpty(a.Password))
+            this.SecretProvider.SavePassword(a.UserName, a.Password);
+        else
+            this.SecretProvider.DeletePassword(a.UserName);
     }
 
     private void DeleteRow(string userName)
@@ -265,13 +209,7 @@ public sealed class AccountManager
             cmd.ExecuteNonQuery();
         }
 
-        using (var deck = OpenDeckDb())
-        {
-            using var d = deck.CreateCommand();
-            d.CommandText = "DELETE FROM passwords WHERE user_name = $user_name;";
-            d.Parameters.AddWithValue("$user_name", userName);
-            d.ExecuteNonQuery();
-        }
+        this.SecretProvider.DeletePassword(userName);
     }
 
     private void Load()
@@ -293,30 +231,6 @@ public sealed class AccountManager
         using (conn)
         {
             ImportLegacyToml(conn);
-            MigrateCryptoToDeck(conn);
-
-            // Crypto material lives in accounts.deck, keyed by user_name.
-            SqliteConnection deck;
-            try
-            {
-                deck = OpenDeckDb();
-            }
-            catch (SqliteException ex)
-            {
-                Log.Error(ex, "accounts.deck is corrupt; quarantining as accounts.deck.bad and recreating it empty");
-                Quarantine(DeckFile);
-                deck = OpenDeckDb();
-            }
-
-            var crypto = new Dictionary<string, (string Key, string Vector, string Cipher)>();
-            using (deck)
-            {
-                using var q = deck.CreateCommand();
-                q.CommandText = "SELECT user_name, aes_key, aes_vector, encrypted_password FROM passwords;";
-                using var r = q.ExecuteReader();
-                while (r.Read())
-                    crypto[r.GetString(0)] = (r.GetString(1), r.GetString(2), r.GetString(3));
-            }
 
             using (var q = conn.CreateCommand())
             {
@@ -333,22 +247,10 @@ public sealed class AccountManager
                     acc.ChosenCharacterWorld = r.GetString(6);
                     acc.ThumbnailUrl = r.GetString(7);
 
-                    if (crypto.TryGetValue(acc.UserName, out var c))
-                    {
-                        acc.AesKey = c.Key;
-                        acc.AesVector = c.Vector;
-                        if (acc.SavePassword && c.Cipher.Length > 0)
-                        {
-                            try
-                            {
-                                acc.Password = new SimpleAES(acc.AesKey, acc.AesVector).DecryptString(c.Cipher);
-                            }
-                            catch (Exception ex)
-                            {
-                                Log.Error(ex, "Could not decrypt the stored password for '{User}' — starting with an empty password field", acc.UserName);
-                            }
-                        }
-                    }
+                    // Password comes from the active secret provider; deck migrations
+                    // already ran in DeckSecretProvider's constructor.
+                    if (acc.SavePassword)
+                        acc.Password = this.SecretProvider.GetPassword(acc.UserName) ?? "";
 
                     this.Accounts.Add(acc);
                 }
