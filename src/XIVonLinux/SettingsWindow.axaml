@@ -174,12 +174,13 @@
                     <TextBlock Grid.Row="9" Grid.Column="0" Grid.ColumnSpan="2" Margin="24,0,0,8" TextWrapping="Wrap"
                                Foreground="#808080" Text="Unsets the TZ environment variable from system provided." />
 
-                    <Grid Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="2" ColumnDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="0,12,0,0">
+                    <Grid Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="2" ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,12,0,0">
                         <Button Grid.Column="0" Name="ClearPrefixButton" Content="Clear Prefix" Click="OnClearPrefix" Margin="0,0,8,0" />
                         <Button Grid.Column="1" Name="ClearLogsButton" Content="Clear Logs" Click="OnClearLogs" Margin="0,0,8,0" />
                         <Button Grid.Column="2" Name="ClearDalamudButton" Content="Clear Dalamud Files" Click="OnClearDalamud" Margin="0,0,8,0" />
                         <Button Grid.Column="3" Name="ClearPluginsButton" Content="Clear Plugins" Click="OnClearPlugins" Margin="0,0,8,0" />
-                        <Button Grid.Column="4" Name="ResetSettingsButton" Content="Reset Settings" Click="OnResetSettings" />
+                        <Button Grid.Column="4" Name="ResetSettingsButton" Content="Reset Settings" Click="OnResetSettings" Margin="0,0,8,0" />
+                        <Button Grid.Column="5" Name="GenerateTspackButton" Content="Generate TSPack" Click="OnGenerateTspack" />
                     </Grid>
                 </Grid>
             </TabItem>

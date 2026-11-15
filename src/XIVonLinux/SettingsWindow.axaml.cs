@@ -570,6 +570,25 @@ public partial class SettingsWindow : Window
         }
     }
 
+    /// <summary>Write logs/trouble-&lt;timestamp&gt;.tspack: all non-rotated log files plus
+    /// the trouble.json settings/version snapshot; the path is reported in an alert.</summary>
+    private async void OnGenerateTspack(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
+    {
+        if (this.settingsService is null)
+            return;
+        try
+        {
+            var settings = this.settingsService.Settings;
+            var path = await Task.Run(() => TspackGenerator.SavePack(settings));
+            ShowAlert($"TSPack saved to {path}");
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "[BUTTON] Generate TSPack failed");
+            ShowAlert($"Failed to generate TSPack: {ex.Message}");
+        }
+    }
+
     /// <summary>Persist all settings, close the modal; the main window refocuses afterwards.</summary>
     private void OnSave(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
     {
