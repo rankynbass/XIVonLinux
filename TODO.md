@@ -59,5 +59,6 @@ Changes to the main page
 
 ### Add Troubleshoot button
 * [DONE 2026-11-14 21:04 PT via 49bd097] Have a dropdown for disabling dalamud, third party plugins, etc. Refer to XIVLauncher.Core for details. Priority: Medium.
+* Add Repair to the troubleshoot button. Refer to XIVLauncher.Core for details. Priority: Medium.
 
 
