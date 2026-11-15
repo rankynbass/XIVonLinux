@@ -37,6 +37,7 @@ public sealed class LoginService : IDisposable
     private readonly string configPath;
     private readonly UmuPrefix prefix;
     private readonly ClientLanguage language;
+    private readonly long maxDownloadSpeedBps;
     private AriaPatchAcquisition? acquisition;
 
     /// <summary>App-layer service: takes plain values (XIVLauncher.Common.Storage,
@@ -44,10 +45,12 @@ public sealed class LoginService : IDisposable
     /// frontierUrl is the launcher's frontier URL template (two format holes:
     /// lang, time) fetched from the launcher client config.</summary>
     public LoginService(Storage storage, string configPath, string patchCachePath, UmuPrefix prefix, ClientLanguage language = ClientLanguage.English,
-        string frontierUrl = "https://launcher.finalfantasyxiv.com/v740/index.html?rc_lang={0}&time={1}")
+        string frontierUrl = "https://launcher.finalfantasyxiv.com/v740/index.html?rc_lang={0}&time={1}",
+        int maxDownloadSpeedKibps = 0)
     {
         this.storage = storage;
         this.configPath = configPath;
+        this.maxDownloadSpeedBps = maxDownloadSpeedKibps <= 0 ? 0L : (long)maxDownloadSpeedKibps * 1024;
         this.patchCachePath = patchCachePath;
         this.prefix = prefix;
         this.language = language;
@@ -223,7 +226,7 @@ public sealed class LoginService : IDisposable
         if (acquisition is null)
         {
             acquisition = new AriaPatchAcquisition(logFile);
-            await acquisition.StartIfNeededAsync(0); // no speed limit
+            await acquisition.StartIfNeededAsync(this.maxDownloadSpeedBps); // user-set limit, 0 = unlimited
         }
 
         var installer = new PatchInstaller(gamePath, keepPatches: false);
@@ -242,7 +245,7 @@ public sealed class LoginService : IDisposable
 
         var speed = 0d;
         foreach (var s in patcher.Speeds) speed += s;
-        status($"{repo} done: {(done ? "verified" : "FAILED")}, {total} patches, last speed {speed / 1024 / 1024:0.0} MB/s");
+        status($"{repo} done: {(done ? "verified" : "FAILED")}, {total} patches, last speed {speed / 1024 / 1024:0.0} MiB/s");
 
         return done;
     }
@@ -301,7 +304,7 @@ public sealed class LoginService : IDisposable
     {
         var logFile = storage.GetFile("logs/aria2.log");
         acquisition = new AriaPatchAcquisition(logFile);
-        await acquisition.StartIfNeededAsync(0); // no speed limit
+        await acquisition.StartIfNeededAsync(this.maxDownloadSpeedBps); // user-set limit, 0 = unlimited
 
         var outFile = new FileInfo(Path.Combine(targetDir.FullName, patch.GetFilePath()));
         Directory.CreateDirectory(outFile.Directory!.FullName);
@@ -317,7 +320,7 @@ public sealed class LoginService : IDisposable
             if (args.Progress - lastReport >= 100_000_000)
             {
                 lastReport = args.Progress;
-                status($"downloading {patch.VersionId}: {args.Progress / 1048576} MB / {patch.Length / 1048576} MB @ {args.BytesPerSecondSpeed / 1048576:0.0} MB/s");
+                status($"downloading {patch.VersionId}: {args.Progress / 1048576} MB / {patch.Length / 1048576} MB @ {args.BytesPerSecondSpeed / 1048576:0.0} MiB/s");
             }
         };
         task.Complete += (_, result) => tcs.TrySetResult(result);

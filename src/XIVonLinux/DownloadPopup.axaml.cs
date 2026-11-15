@@ -19,7 +19,7 @@ namespace XIVonLinux;
 ///
 /// Real mode reads LoginService.CurrentPatcher via LoginService.ProgressSnapshot.
 /// Fake test mode (XIVON_FAKE_DOWNLOADS=1, no network) drives the same layout from
-/// 40 simulated patches (20-119 MB) across 4 slots at 10-25 MB/s, each patch
+/// 40 simulated patches (20-119 MB) across 4 slots at 10-25 MiB/s, each patch
 /// verifying for 2 ticks — built so the bar layout can be exercised without aria2.
 /// Cancel pauses (cancels) all downloads, then closes; the X button does the same
 /// via the Closing event.
@@ -134,7 +134,7 @@ public partial class DownloadPopup : Window
         // File bars: min 0, max 4. 1-3 downloading files show that many bars, 4+ show 4.
         var activeBars = rows.Where(row => row.State != "queued").Take(4).ToList();
 
-        SummaryText.Text = $"{done}/{totalFiles} complete · {queued} queued · {speed:0.0} MB/s · install {done}/{totalFiles}";
+        SummaryText.Text = $"{done}/{totalFiles} complete · {queued} queued · {speed:0.0} MiB/s · install {done}/{totalFiles}";
 
         if (fakeMode)
             Log.Information("Fake tick: bars={Bars} done={Done} queued={Queued} inst={Inst} bytes={Bytes}/{Total}",
@@ -166,7 +166,7 @@ public partial class DownloadPopup : Window
                 ? $"{row.VersionId} — installing"
                 : row.State == "verifying"
                 ? $"{row.VersionId} — verifying SHA1 {FmtBytes(row.Downloaded)}/{FmtBytes(row.Total)}"
-                : $"{row.VersionId} — {FmtBytes(row.Downloaded)}/{FmtBytes(row.Total)} at {row.SpeedBps / 1024 / 1024:0.0} MB/s";
+                : $"{row.VersionId} — {FmtBytes(row.Downloaded)}/{FmtBytes(row.Total)} at {row.SpeedBps / 1024 / 1024:0.0} MiB/s";
             BarsPanel.Children.Add(new TextBlock
             {
                 Text = label,

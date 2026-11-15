@@ -133,6 +133,18 @@
                 </Grid>
             </TabItem>
 
+            <TabItem Header="Patching">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,12,0,0">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Speed (KiB/s)" VerticalAlignment="Center" Margin="0,0,12,6" />
+                    <TextBox Grid.Row="0" Grid.Column="1" Name="SpeedBox" Margin="0,0,0,6"
+                             Watermark="Speed (KiB/s, 0 = unlimited)" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Connections" VerticalAlignment="Center" Margin="0,0,12,6" />
+                    <TextBox Grid.Row="1" Grid.Column="1" Name="ConnectionsBox" Margin="0,0,0,6"
+                             Watermark="Max connections per server (1-16)" />
+                </Grid>
+            </TabItem>
+
         </TabControl>
         </ScrollViewer>
     </DockPanel>

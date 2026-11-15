@@ -10,10 +10,10 @@ using XIVLauncher.Common;
 namespace XIVonLinux;
 
 /// <summary>
-/// User-configurable launcher settings, persisted as ~/.xivonlinux/settings.toml
-/// via XIVLauncher.Common.Storage("xivonlinux"), split into [game], [proton],
-/// [dalamud] and [login] sections. Credentials are NOT persisted to disk —
-/// Password/OTP are UI-only fields, cleared on save.
+/// User-configurable launcher settings, persisted as settings.toml in
+/// ~/.config/xivonlinux via XIVLauncher.Common.Storage("xivonlinux"), split into
+/// [game], [proton], [dalamud], [login] and [patch] sections. Credentials are NOT
+/// persisted to disk — Password/OTP are UI-only fields, cleared on save.
 /// </summary>
 public sealed class LaunchSettings
 {
@@ -28,6 +28,10 @@ public sealed class LaunchSettings
     public bool UseXlAuthMacros { get; set; }         // XL auth macros (IsOtpServer parity; no server on Linux, UI parity)
     public bool UseUidCache { get; set; }             // enable the uid cache (XIVLauncher.Core cache is a stub; parity UI)
     public string UidCache { get; set; } = "";        // cached uid string; Reset button clears it
+
+    // Patching tab
+    public int MaxDownloadSpeedKibps { get; set; } = 0; // KiB/s, 0 = unlimited; aria2 max-overall-download-limit
+    public int MaxConnections { get; set; } = 4;       // aria2 max-connection-per-server (1-16)
 
     // Proton tab
     public string ProtonPath { get; set; } = "";
@@ -160,6 +164,11 @@ public sealed class SettingsService
         // Login identity comes from accounts.db: [login] persists only the current account.
         if (!string.IsNullOrEmpty(this.Settings.CurrentAccountId))
             builder.AppendLine($"current_account = {TomlString(this.Settings.CurrentAccountId)}");
+        builder.AppendLine();
+
+        builder.AppendLine("[patch]");
+        builder.AppendLine($"max_download_speed_kibps = {this.Settings.MaxDownloadSpeedKibps}");
+        builder.AppendLine($"max_connections = {this.Settings.MaxConnections}");
 
         var file = this.configStorage.GetFile("settings.toml");
         File.WriteAllText(file.FullName, builder.ToString());
@@ -217,8 +226,14 @@ public sealed class SettingsService
 
         int GetInt(TomlTable? sec, string key, int def)
         {
-            if (sec is not null && sec.ContainsKey(key) && sec[key] is int num)
-                return num;
+            if (sec is not null && sec.ContainsKey(key))
+            {
+                // TOML integers deserialize as Int64, not Int32
+                if (sec[key] is int num)
+                    return num;
+                if (sec[key] is long wide)
+                    return (int)wide;
+            }
             return def;
         }
 
@@ -226,6 +241,10 @@ public sealed class SettingsService
         var proton = Sec("proton");
         var dalamud = Sec("dalamud");
         var login = Sec("login");
+        var patch = Sec("patch");
+
+        settings.MaxDownloadSpeedKibps = Math.Clamp(GetInt(patch, "max_download_speed_kibps", settings.MaxDownloadSpeedKibps), 0, 10485760);
+        settings.MaxConnections = Math.Clamp(GetInt(patch, "max_connections", settings.MaxConnections), 1, 16);
 
         if (Get(game, "game_path", "game_location") is string gamePath) settings.GamePath = gamePath;
         if (Get(game, "config_path", "config_path") is string configPath) settings.ConfigPath = configPath;

@@ -68,6 +68,8 @@ public partial class SettingsWindow : Window
         XlAuthCheck.IsChecked = settings.UseXlAuthMacros;
         UidCacheCheck.IsChecked = settings.UseUidCache;
         UidCachePanel.IsVisible = false;   // UID cache UI hidden until implemented
+        SpeedBox.Text = settings.MaxDownloadSpeedKibps.ToString();
+        ConnectionsBox.Text = settings.MaxConnections.ToString();
         DalamudCheck.IsChecked = settings.DalamudEnabled;
 
         // Dalamud tab (XIVLauncher.Core parity): load method, branch, injection delay,
@@ -357,6 +359,20 @@ public partial class SettingsWindow : Window
         settings.IgnoreSteam = IgnoreSteamCheck.IsChecked == true;
         settings.UseXlAuthMacros = XlAuthCheck.IsChecked == true;
         settings.UseUidCache = UidCacheCheck.IsChecked == true;
+
+        // Patching tab: speed in KiB/s (0 = unlimited), connections per server 1-16.
+        if (!int.TryParse(SpeedBox.Text, out var speedKibps) || speedKibps < 0 || speedKibps > 10485760)
+        {
+            ShowAlert("Speed must be a whole number 0-10485760 KiB/s — KiB/s means kilobytes per second, not kilobits. 0 = unlimited.");
+            return;
+        }
+        if (!int.TryParse(ConnectionsBox.Text, out var connections) || connections < 1 || connections > 16)
+        {
+            ShowAlert("Connections must be a whole number 1-16.");
+            return;
+        }
+        settings.MaxDownloadSpeedKibps = speedKibps;
+        settings.MaxConnections = connections;
         settings.ManagedProton = ManagedProtonCheck.IsChecked == true;
         if (settings.ManagedProton && ProtonCombo.SelectedItem is string pick)
             settings.ProtonPath = pick;   // managed mode: the enumerated selection wins

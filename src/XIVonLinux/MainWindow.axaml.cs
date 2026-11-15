@@ -415,7 +415,8 @@ public partial class MainWindow : Window
     private void StartNewsLoad()
     {
         newsService = new LoginService(settingsService.Storage, settingsService.Settings.ConfigPath,
-            settingsService.GetCacheFolder("patches").FullName, null!, ClientLanguage.English, this.frontierUrl);
+            settingsService.GetCacheFolder("patches").FullName, null!, ClientLanguage.English, this.frontierUrl,
+            settingsService.Settings.MaxDownloadSpeedKibps);
         var svc = newsService;
 
         _ = Task.Run(async () =>
@@ -845,7 +846,8 @@ public partial class MainWindow : Window
 
             var lang = Enum.TryParse<ClientLanguage>(settings.Language, out var parsedLang) ? parsedLang : ClientLanguage.English;
             service = new LoginService(this.settingsService.Storage, this.settingsService.Settings.ConfigPath,
-                this.settingsService.GetCacheFolder("patches").FullName, prefix, lang, this.frontierUrl);
+                this.settingsService.GetCacheFolder("patches").FullName, prefix, lang, this.frontierUrl,
+                this.settingsService.Settings.MaxDownloadSpeedKibps);
             Report($"Client language: {lang}");
 
             Report("Checking login gate ...");
