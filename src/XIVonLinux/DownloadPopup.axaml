@@ -1,0 +1,15 @@
+<Window
+    x:Class="XIVonLinux.DownloadPopup"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Width="560"
+    Height="300"
+    WindowStartupLocation="CenterOwner">
+    <StackPanel Margin="16">
+        <TextBlock x:Name="SummaryText" Margin="0,0,0,4" Text="Starting downloads ..."/>
+        <StackPanel x:Name="BarsPanel" Margin="0,0,0,4"/>
+        <DockPanel LastChildFill="False">
+            <Button x:Name="CancelButton" Content="Cancel" Padding="16,6" DockPanel.Dock="Right"/>
+        </DockPanel>
+    </StackPanel>
+</Window>
