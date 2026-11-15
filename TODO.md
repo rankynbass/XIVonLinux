@@ -34,7 +34,7 @@ Changes and additions to Settings window
 * [Pointless. Ignored] Add a toggle for DXVK-Nvapi. Priority: Low
 
 ### Troubleshooting
-* Add a troubleshooting tab with hacks from XIVLauncher.Core. Priority: Low
+* [DONE 2026-11-15 13:56 PT via bb9e57e, 2a79eff] Add a troubleshooting tab with hacks from XIVLauncher.Core. Priority: Low
 * Generate tspacks from here. Priority: Low
 
 ## Main Page fixes
