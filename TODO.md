@@ -20,6 +20,7 @@ Changes and additions to Settings window
 * [DONE 2026-11-14 18:03 PT via 8a78b6b] Add features from XIVLauncher.Core Settings->Game tab. Priority: Medium
 * Add UID cache function. Priority: Low
 * Add Auto-login macro. Priority: Low
+* Fix the Args field so that it actually passes key=value pairs as environment variables. Priority: Medium
 
 ### Patching
 * [DONE 2026-11-15 08:30 PT via e6edabe] Move patching to its own tab. Priority: Low
