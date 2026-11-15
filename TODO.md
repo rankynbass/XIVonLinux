@@ -30,7 +30,7 @@ Changes and additions to Settings window
 * [DONE 2026-11-14 15:00 PT] Have a toggle for Custom proton or Managed proton. Priority: High
 * [DONE 2026-11-14 15:00 PT] If Steam-managed proton is selected, enumerate a dropdown list from ~/.local/share/Steam/compatibilitytools.d, ~/.local/share/Steam/steamapps/common, and ~/.xivonlinux/tools/proton. Priority: High
 * [DONE 2026-11-14 15:00 PT] Manage umu-launcher versions as well as proton. We should always keep two, the latest version and the previous version, in case there's a bad update pushed. We should download them into ~/.xivonlinux/tools/umu. Priority: High
-* Add a toggle for DXVK-Nvapi. Priority: Low
+* [Pointless. Ignored] Add a toggle for DXVK-Nvapi. Priority: Low
 
 ### Troubleshooting
 * Add a troubleshooting tab with hacks from XIVLauncher.Core. Priority: Low
