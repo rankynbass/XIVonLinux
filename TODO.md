@@ -58,6 +58,6 @@ Changes to the main page
 * [DONE 2026-11-14 18:14 PT via 2df9e7d, 28923c0] All logs should go in the STORAGE/logs folder. This includes dalamud logs, launcher logs, wine/proton logs, etc. Priority: Medium, before tspacks.
 
 ### Add Troubleshoot button
-* Have a dropdown for disabling dalamud, third party plugins, etc. Refer to XIVLauncher.Core for details. Priority: Medium.
+* [DONE 2026-11-14 21:04 PT via 49bd097] Have a dropdown for disabling dalamud, third party plugins, etc. Refer to XIVLauncher.Core for details. Priority: Medium.
 
 
