@@ -72,6 +72,31 @@ public partial class SettingsWindow : Window
         ConnectionsBox.Text = settings.MaxConnections.ToString();
         DalamudCheck.IsChecked = settings.DalamudEnabled;
 
+        // Troubleshooting tab: XIVLauncher.Core hacks. Locale hack shows the detected
+        // C.* UTF-8 locale, warns when LANG is already UTF-8, and is disabled when none exists.
+        FixLdpCheck.IsChecked = settings.FixLdp;
+        FixXModifiersCheck.IsChecked = settings.FixXModifiers;
+        FixLibIcuucCheck.IsChecked = settings.FixLibIcuuc;
+        DontUseSystemTzCheck.IsChecked = settings.DontUseSystemTz;
+        var ctype = LaunchSettings.DetectCType();
+        var lang = Environment.GetEnvironmentVariable("LANG") ?? "";
+        FixLocaleCheck.IsEnabled = ctype.Length > 0;
+        FixLocaleCheck.IsChecked = settings.FixLocale && ctype.Length > 0;
+        if (ctype.Length == 0)
+        {
+            FixLocaleCheck.Content = "Hack: Force locale";
+            LocaleHackLabel.Text = "Hack Disabled. Could not find a UTF-8 C locale. " +
+                "You may have to set LC_ALL manually if LANG is not a UTF-8 type.";
+        }
+        else
+        {
+            FixLocaleCheck.Content = $"Hack: Force locale to {ctype}";
+            LocaleHackLabel.Text = $"Sets LC_ALL and LC_CTYPE to \"{ctype}\". This can fix some issues " +
+                "with non-Latin unicode characters in file paths if LANG is not a UTF-8 type.";
+            if (lang.ToUpper().Contains("UTF"))
+                LocaleHackLabel.Text += $" Your locale is \"{lang}\". You probably don't need this hack.";
+        }
+
         // Dalamud tab (XIVLauncher.Core parity): load method, branch, injection delay,
         // manual injector override. Combo Tags carry the DalamudLoadMethod enum names.
         LoadMethodCombo.Items.Add(new ComboBoxItem { Content = "Entrypoint", Tag = "EntryPoint" });
@@ -400,6 +425,11 @@ public partial class SettingsWindow : Window
         settings.WineDebugEnabled = WineDebugCheck.IsChecked == true;
         settings.WineDebugValue = string.IsNullOrWhiteSpace(WineDebugBox.Text)
             ? LaunchSettings.DefaultWineDebugValue : WineDebugBox.Text;
+        settings.FixLdp = FixLdpCheck.IsChecked == true;
+        settings.FixXModifiers = FixXModifiersCheck.IsChecked == true;
+        settings.FixLibIcuuc = FixLibIcuucCheck.IsChecked == true;
+        settings.FixLocale = FixLocaleCheck.IsChecked == true;
+        settings.DontUseSystemTz = DontUseSystemTzCheck.IsChecked == true;
         settings.DalamudEnabled = DalamudCheck.IsChecked == true;
 
         // Dalamud tab: load method name, delay, branch, manual injector path.

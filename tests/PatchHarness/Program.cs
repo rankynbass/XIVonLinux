@@ -74,6 +74,54 @@ if (args.Length > 0 && args[0] == "settings")
     Console.WriteLine($"wine_debug_enabled read back as: {s.Settings.WineDebugEnabled}");
     Console.WriteLine($"wine_debug_value: {s.Settings.WineDebugValue}");
     Console.WriteLine($"WineDebugEnv resolves to: {s.Settings.WineDebugEnv}");
+    Console.WriteLine($"hacks: fix_ldp={s.Settings.FixLdp} fix_xmodifiers={s.Settings.FixXModifiers} " +
+        $"fix_libicuuc={s.Settings.FixLibIcuuc} fix_locale={s.Settings.FixLocale} dont_use_system_tz={s.Settings.DontUseSystemTz}");
+    Console.WriteLine($"hack env pairs: {string.Join(" ", s.Settings.HackEnvPairs().Select(p => $"{p.Key}={p.Value}"))}");
+    return;
+}
+if (args.Length > 0 && args[0] == "hacks")
+{
+    var s = new SettingsService();
+    s.Settings.FixLdp = true; s.Settings.FixXModifiers = true; s.Settings.FixLibIcuuc = true;
+    s.Settings.FixLocale = true; s.Settings.DontUseSystemTz = true;
+    Environment.SetEnvironmentVariable("LD_PRELOAD", "/usr/lib/gameoverlayrenderer.so:/usr/lib/libnss_cache.so.2");
+    var pairs = s.Settings.HackEnvPairs().ToList();
+    var env = new System.Collections.Generic.Dictionary<string, string>();
+    foreach (var p in pairs) env[p.Key] = p.Value;
+
+    var prefixRoot = s.Settings.PrefixPath;
+    var prefix = new UmuPrefix(
+        new DirectoryInfo(Path.Combine(prefixRoot, "pfx")),
+        prefixRoot,
+        s.Settings.GamePath,
+        "umu-steam",
+        s.Settings.ProtonPath,
+        null, null);
+    var umuRun = $"/home/rankyn/.local/share/xivonlinux/tools/umu/1.4.4/umu-run";
+    var runner = new UmuCommandRunner(prefix, umuRun, null, s.Settings.WineDebugEnv);
+
+    var proc = runner.RunInPrefix(new[] { "cmd", "/c", "set" }, "", env, true, false);
+    var stdout = proc.StandardOutput.ReadToEnd();
+    proc.WaitForExit();
+
+    var lines = stdout.Split('\n').Select(l => l.Trim());
+    foreach (var l in lines.Where(l => l.StartsWith("LD_PRELOAD=") || l.StartsWith("LC_")))
+        Console.WriteLine($"prefix env: {l}");
+    void Check(string expected)
+        => Console.WriteLine(lines.Contains(expected) ? $"OK   {expected}" : $"MISS {expected}");
+
+    Check("XMODIFIERS=@im=null");
+    Check("DOTNET_SYSTEM_GLOBALIZATION_USENLS=true");
+    var ctype = LaunchSettings.DetectCType();
+    Console.WriteLine($"detected ctype: '{ctype}'");
+    Check($"LC_CTYPE={ctype}");
+    // LD_PRELOAD: gameoverlayrenderer must be gone, the rest survives (pressure-vessel
+    // remaps host paths into /run/host). LC_ALL is consumed by wine's setlocale init
+    // and is not in the Windows env block, so it is not checked here.
+    var ldp = lines.FirstOrDefault(l => l.StartsWith("LD_PRELOAD="));
+    Console.WriteLine(ldp is not null && !ldp.Contains("gameoverlayrenderer") && ldp.Contains("libnss_cache.so.2")
+        ? "OK   LD_PRELOAD cleaned" : $"MISS LD_PRELOAD cleaned ({ldp})");
+    Check("TZ=");
     return;
 }
 var settings = new SettingsService();

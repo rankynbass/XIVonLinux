@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using Serilog;
 using Tomlyn;
@@ -52,6 +54,71 @@ public sealed class LaunchSettings
         : string.IsNullOrWhiteSpace(WineDebugValue) ? DefaultWineDebugValue : WineDebugValue;
 
     public const string DefaultWineDebugValue = "+warn,+overlay,fixme-all";
+
+    /// <summary>Troubleshooting hacks (XIVLauncher.Core parity): environment changes applied
+    /// to every game launch. All default off; each produces env pairs via HackEnvPairs.</summary>
+    public bool FixLdp { get; set; }          // strip gameoverlayrenderer.so entries from LD_PRELOAD
+    public bool FixXModifiers { get; set; }   // XMODIFIERS=@im=null
+    public bool FixLibIcuuc { get; set; }     // DOTNET_SYSTEM_GLOBALIZATION_USENLS=true
+    public bool FixLocale { get; set; }       // LC_ALL/LC_CTYPE = detected C.* UTF-8 locale
+    public bool DontUseSystemTz { get; set; } // TZ set to empty string
+
+    /// <summary>First C.* UTF-8 locale found via locale -a (XIVLauncher.Core GetCType shape);
+    /// empty string when none exists. Cached, since launches compute it repeatedly.</summary>
+    public static string DetectCType()
+    {
+        if (cachedCType is not null)
+            return cachedCType;
+        var psi = new ProcessStartInfo("sh")
+        {
+            Arguments = "-c \"locale -a 2>/dev/null | grep -i utf\"",
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+        };
+        var proc = Process.Start(psi)!;
+        var lines = proc.StandardOutput.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        cachedCType = Array.Find(lines, s => s.ToUpper().StartsWith("C.")) ?? string.Empty;
+        return cachedCType;
+    }
+
+    private static string? cachedCType;
+
+    /// <summary>Environment pairs produced by the enabled hacks. Plain types only (layering
+    /// rule); merge at EVERY launch site — pairs from AdditionalArgs concatenate after so the
+    /// user can override a hack, exactly as XIVLauncher.Core's TZ comment intends.</summary>
+    public IEnumerable<KeyValuePair<string, string>> HackEnvPairs()
+    {
+        var pairs = new List<KeyValuePair<string, string>>();
+
+        if (FixLdp)
+        {
+            var dirty = Environment.GetEnvironmentVariable("LD_PRELOAD") ?? string.Empty;
+            var kept = dirty.Split(':', StringSplitOptions.RemoveEmptyEntries)
+                .Where(s => !s.Contains("gameoverlayrenderer.so"));
+            pairs.Add(new KeyValuePair<string, string>("LD_PRELOAD", string.Join(":", kept)));
+        }
+
+        if (FixLocale)
+        {
+            var ctype = DetectCType();
+            if (ctype.Length > 0)
+            {
+                pairs.Add(new KeyValuePair<string, string>("LC_ALL", ctype));
+                pairs.Add(new KeyValuePair<string, string>("LC_CTYPE", ctype));
+            }
+        }
+
+        if (FixLibIcuuc)
+            pairs.Add(new KeyValuePair<string, string>("DOTNET_SYSTEM_GLOBALIZATION_USENLS", "true"));
+
+        if (FixXModifiers)
+            pairs.Add(new KeyValuePair<string, string>("XMODIFIERS", "@im=null"));
+
+        if (DontUseSystemTz)
+            pairs.Add(new KeyValuePair<string, string>("TZ", string.Empty));
+
+        return pairs;
+    }
 
     /// <summary>Parse AdditionalArgs as a space-separated list of KEY=VALUE pairs. VALUE
     /// may be double-quoted, single-quoted, or unquoted; KEY= (empty value) is valid,
@@ -237,6 +304,14 @@ public sealed class SettingsService
         builder.AppendLine("[patch]");
         builder.AppendLine($"max_download_speed_kibps = {this.Settings.MaxDownloadSpeedKibps}");
         builder.AppendLine($"max_connections = {this.Settings.MaxConnections}");
+        builder.AppendLine();
+
+        builder.AppendLine("[hack]");
+        builder.AppendLine($"fix_ldp = {this.Settings.FixLdp.ToString().ToLowerInvariant()}");
+        builder.AppendLine($"fix_xmodifiers = {this.Settings.FixXModifiers.ToString().ToLowerInvariant()}");
+        builder.AppendLine($"fix_libicuuc = {this.Settings.FixLibIcuuc.ToString().ToLowerInvariant()}");
+        builder.AppendLine($"fix_locale = {this.Settings.FixLocale.ToString().ToLowerInvariant()}");
+        builder.AppendLine($"dont_use_system_tz = {this.Settings.DontUseSystemTz.ToString().ToLowerInvariant()}");
 
         var file = this.configStorage.GetFile("settings.toml");
         File.WriteAllText(file.FullName, builder.ToString());
@@ -313,6 +388,13 @@ public sealed class SettingsService
 
         settings.MaxDownloadSpeedKibps = Math.Clamp(GetInt(patch, "max_download_speed_kibps", settings.MaxDownloadSpeedKibps), 0, 10485760);
         settings.MaxConnections = Math.Clamp(GetInt(patch, "max_connections", settings.MaxConnections), 1, 16);
+
+        var hack = Sec("hack");
+        settings.FixLdp = GetBool(hack, "fix_ldp", "fix_ldp", settings.FixLdp);
+        settings.FixXModifiers = GetBool(hack, "fix_xmodifiers", "fix_xmodifiers", settings.FixXModifiers);
+        settings.FixLibIcuuc = GetBool(hack, "fix_libicuuc", "fix_libicuuc", settings.FixLibIcuuc);
+        settings.FixLocale = GetBool(hack, "fix_locale", "fix_locale", settings.FixLocale);
+        settings.DontUseSystemTz = GetBool(hack, "dont_use_system_tz", "dont_use_system_tz", settings.DontUseSystemTz);
 
         if (Get(game, "game_path", "game_location") is string gamePath) settings.GamePath = gamePath;
         if (Get(game, "config_path", "config_path") is string configPath) settings.ConfigPath = configPath;

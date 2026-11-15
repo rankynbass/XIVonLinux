@@ -1031,9 +1031,13 @@ public partial class MainWindow : Window
         var extraArgs = $" UserPath={userPathWine}";
         // AdditionalArgs are KEY=VALUE pairs passed as environment variables to the
         // game process (validated on save, so ParseArgs is safe here).
-        var extraEnv = LaunchSettings.ParseArgs(gameSettings.AdditionalArgs)
-            .Select(p => new KeyValuePair<string, string>(p.key, p.value));
-        Report($"extraEnv pairs: {string.Join(" ", extraEnv.Select(p => $"{p.Key}={p.Value}"))} (from AdditionalArgs='{gameSettings.AdditionalArgs}')");
+        // Troubleshooting-hack env pairs first, AdditionalArgs pairs after: the user can
+        // override a hack through AdditionalArgs, as XIVLauncher.Core intends.
+        var extraEnv = gameSettings.HackEnvPairs()
+            .Concat(LaunchSettings.ParseArgs(gameSettings.AdditionalArgs)
+                .Select(p => new KeyValuePair<string, string>(p.key, p.value)))
+            .ToList();
+        Report($"extraEnv pairs: {string.Join(" ", extraEnv.Select(p => $"{p.Key}={p.Value.Replace("\n", "\\n")}"))} (hacks + AdditionalArgs='{gameSettings.AdditionalArgs}')");
         var dpi = Enum.TryParse<DpiAwareness>(gameSettings.DpiAwareness, out var parsedDpi) ? parsedDpi : DpiAwareness.Unaware;
         Report("LaunchGame (login session, encrypted args)");
         var gameRunner = new LinuxGameRunner(prefix, this.umuRunPath, WineLogPath, this.settingsService.Settings.WineDebugEnv, extraEnv);
@@ -1275,10 +1279,13 @@ public partial class MainWindow : Window
         };
         Report($"In-prefix injector: SE login session + {loadMethod} + delay {startInfo.DelayInitializeMs}ms");
         // AdditionalArgs KEY=VALUE pairs → env vars for the injector, inherited by the
-        // game it spawns (validated on save, so ParseArgs is safe here).
-        var extraEnv = LaunchSettings.ParseArgs(this.settingsService.Settings.AdditionalArgs)
-            .Select(p => new KeyValuePair<string, string>(p.key, p.value));
-        Report($"injector extraEnv pairs: {string.Join(" ", extraEnv.Select(p => $"{p.Key}={p.Value}"))} (from AdditionalArgs='{this.settingsService.Settings.AdditionalArgs}')");
+        // game it spawns (validated on save, so ParseArgs is safe here). Hack pairs first,
+        // AdditionalArgs pairs after: the user can override a hack through AdditionalArgs.
+        var extraEnv = this.settingsService.Settings.HackEnvPairs()
+            .Concat(LaunchSettings.ParseArgs(this.settingsService.Settings.AdditionalArgs)
+                .Select(p => new KeyValuePair<string, string>(p.key, p.value)))
+            .ToList();
+        Report($"injector extraEnv pairs: {string.Join(" ", extraEnv.Select(p => $"{p.Key}={p.Value.Replace("\n", "\\n")}"))} (hacks + AdditionalArgs='{this.settingsService.Settings.AdditionalArgs}')");
         var runner = new LinuxDalamudRunner(prefix, this.umuRunPath, WineLogPath, this.settingsService.Settings.WineDebugEnv, extraEnv);
         var proc = runner.Run(injectorExe, false, noPlugins, noThirdPlugins, gameExe, gameArgs, "", env,
             loadMethod, startInfo);

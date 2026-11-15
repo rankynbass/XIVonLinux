@@ -145,6 +145,35 @@
                 </Grid>
             </TabItem>
 
+            <TabItem Header="Troubleshooting">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,12,0,0">
+                    <CheckBox Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Name="FixLdpCheck"
+                              Content="Hack: Disable gameoverlayrenderer.so" Margin="0,0,0,2" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="24,0,0,8" TextWrapping="Wrap"
+                               Foreground="#808080" Text="May fix black screen on launch (Steam Deck) and some stuttering issues after 40+ minutes." />
+
+                    <CheckBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Name="FixXModifiersCheck"
+                              Content="Hack: XMODIFIERS=&quot;@im=null&quot;" Margin="0,0,0,2" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Margin="24,0,0,8" TextWrapping="Wrap"
+                               Foreground="#808080" Text="Fixes some mouse-related issues, some stuttering issues" />
+
+                    <CheckBox Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Name="FixLibIcuucCheck"
+                              Content="Hack: Fix libicuuc Dalamud error" Margin="0,0,0,2" />
+                    <TextBlock Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Margin="24,0,0,8" TextWrapping="Wrap"
+                               Foreground="#808080" Text="Fixes a specific &quot;an internal Dalamud error has occurred.&quot; In the terminal you will see this text: &#10;Cannot get symbol u_charsToUChars from libicuuc Error: 127" />
+
+                    <CheckBox Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Name="FixLocaleCheck"
+                              Content="Hack: Force locale" Margin="0,0,0,2" />
+                    <TextBlock Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="2" Name="LocaleHackLabel" Margin="24,0,0,8" TextWrapping="Wrap"
+                               Foreground="#808080" Text="Sets LC_ALL and LC_CTYPE to the detected UTF-8 locale." />
+
+                    <CheckBox Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="2" Name="DontUseSystemTzCheck"
+                              Content="Hack: Don't use system timezone" Margin="0,0,0,2" />
+                    <TextBlock Grid.Row="9" Grid.Column="0" Grid.ColumnSpan="2" Margin="24,0,0,8" TextWrapping="Wrap"
+                               Foreground="#808080" Text="Unsets the TZ environment variable from system provided." />
+                </Grid>
+            </TabItem>
+
         </TabControl>
         </ScrollViewer>
     </DockPanel>
