@@ -2,8 +2,8 @@
     x:Class="XIVonLinux.SettingsWindow"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Width="640"
-    Height="460"
+    Width="900"
+    Height="500"
     MinWidth="480"
     MinHeight="360"
     Title="Settings"
@@ -18,7 +18,9 @@
 
         <!-- Resizable window with scrolling content: tall tabs (Game, Proton) scroll
              vertically; the Save row stays docked at the bottom. -->
-        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+        <!-- Horizontal scroll disabled: Auto measures content at infinite width, which
+             defeats TextWrapping on the tab labels. -->
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
             <TabControl>
 
             <TabItem Header="Game">
