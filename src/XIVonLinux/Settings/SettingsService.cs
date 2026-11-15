@@ -10,7 +10,7 @@ using Tomlyn.Model;
 using Tomlyn.Serialization;
 using XIVLauncher.Common;
 
-namespace XIVonLinux;
+namespace XIVonLinux.Settings;
 
 /// <summary>
 /// User-configurable launcher settings, persisted as settings.toml in

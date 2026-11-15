@@ -1,5 +1,5 @@
 <Window
-    x:Class="XIVonLinux.DownloadPopup"
+    x:Class="XIVonLinux.Download.DownloadPopup"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Width="560"

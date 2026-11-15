@@ -8,7 +8,7 @@ using Avalonia.Threading;
 using Serilog;
 using XIVLauncher.Common.Game.Patch;
 
-namespace XIVonLinux;
+namespace XIVonLinux.Download;
 
 /// <summary>
 /// Non-modal download progress popup: one longest overall bar spanning every patch

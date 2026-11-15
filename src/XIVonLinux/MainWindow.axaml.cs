@@ -21,6 +21,9 @@ using XIVLauncher.Common.Game.Patch;
 using XIVLauncher.Common.Linux;
 using XivGame = XIVLauncher.Common.Game.Launcher;
 
+using XIVonLinux.Download;
+using XIVonLinux.Settings;
+
 namespace XIVonLinux;
 
 public partial class MainWindow : Window

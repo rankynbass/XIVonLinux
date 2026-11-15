@@ -1,7 +1,7 @@
 using System;
 using System.Security.Cryptography;
 
-namespace XIVonLinux;
+namespace XIVonLinux.Secrets;
 
 /// <summary>Per-account AES-CBC (256-bit key, 128-bit IV) obfuscation of saved
 /// passwords. NOT security hardening — it is obfuscation so the password is never

@@ -1,4 +1,4 @@
-namespace XIVonLinux;
+namespace XIVonLinux.Secrets;
 
 /// <summary>Password storage backend. Saved passwords go through exactly one
 /// provider: the OS keyring (KeychainSecretProvider), the accounts.deck

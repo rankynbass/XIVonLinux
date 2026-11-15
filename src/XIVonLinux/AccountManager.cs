@@ -7,6 +7,9 @@ using Serilog;
 using Tomlyn;
 using Tomlyn.Model;
 
+using XIVonLinux.Secrets;
+using XIVonLinux.Settings;
+
 namespace XIVonLinux;
 
 /// <summary>Loads/saves accounts.db (SQLite) with one accounts table keyed by

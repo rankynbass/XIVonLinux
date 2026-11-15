@@ -7,6 +7,8 @@ using XIVLauncher.Common.Game;
 
 using ZipArchive = System.IO.Compression.ZipArchive;
 
+using XIVonLinux.Settings;
+
 namespace XIVonLinux;
 
 /// <summary>Diagnostic trouble pack, XIVLauncher.Core PackGenerator parity.

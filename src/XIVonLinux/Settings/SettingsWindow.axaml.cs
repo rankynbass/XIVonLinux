@@ -9,7 +9,7 @@ using Avalonia.Threading;
 using XIVLauncher.Common.Dalamud;
 using XIVLauncher.Common.Linux;
 
-namespace XIVonLinux;
+namespace XIVonLinux.Settings;
 
 public partial class SettingsWindow : Window
 {

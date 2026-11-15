@@ -2,7 +2,7 @@ using KeySharp;
 
 using Serilog;
 
-namespace XIVonLinux;
+namespace XIVonLinux.Secrets;
 
 /// <summary>Password storage in the freedesktop secret service (org.freedesktop.secrets
 /// — gnome-keyring, KWallet, KeeShare) via KeySharp. No encryption is done here: the

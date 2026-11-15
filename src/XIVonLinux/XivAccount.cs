@@ -1,3 +1,5 @@
+using XIVonLinux.Secrets;
+
 namespace XIVonLinux;
 
 /// <summary>A saved login account, persisted as one row in the accounts table of

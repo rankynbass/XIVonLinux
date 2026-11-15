@@ -4,7 +4,9 @@ using Microsoft.Data.Sqlite;
 
 using Serilog;
 
-namespace XIVonLinux;
+using XIVonLinux.Settings;
+
+namespace XIVonLinux.Secrets;
 
 /// <summary>Fallback password backend: passwords are stored as hex AES-CBC
 /// ciphertext in the separate SQLite file ~/.xivonlinux/accounts.deck, keyed by

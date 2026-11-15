@@ -7,6 +7,8 @@ using System.Net.Http;
 using System.Text.Json;
 using Serilog;
 
+using XIVonLinux.Settings;
+
 namespace XIVonLinux;
 
 /// <summary>

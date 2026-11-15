@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using XIVonLinux;
+using XIVonLinux.Settings;
 using XIVLauncher.Common;
 using XIVLauncher.Common.Linux;
 using XIVLauncher.Common.Game;
