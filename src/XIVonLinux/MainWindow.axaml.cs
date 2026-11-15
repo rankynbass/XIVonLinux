@@ -654,6 +654,9 @@ public partial class MainWindow : Window
             cancelButton.Click += (_, __) => { tcs.TrySetResult(null); Dispatcher.UIThread.Post(() => window.Close()); };
             codeBox.KeyDown += (_, e) => { if (e.Key == Key.Enter) TryLogin(); };
 
+            // Focus the code box on open so the user can type immediately.
+            window.Opened += (_, __) => codeBox.Focus();
+
             window.Show(this);
             return window;
         });
