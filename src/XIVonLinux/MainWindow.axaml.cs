@@ -1123,13 +1123,13 @@ public partial class MainWindow : Window
             return;
         }
         var storage = this.settingsService.Root.FullName;
-        var logs = Path.Combine(storage, "xivonlinux-logs");
+        var logs = Path.Combine(storage, "logs");
         Directory.CreateDirectory(logs);
 
         var startInfo = new DalamudStartInfo
         {
             WorkingDirectory = injectorExe.Directory!.FullName,
-            ConfigurationPath = Path.Combine(storage, "xivonlinux-dalamudConfig.json"),
+            ConfigurationPath = Path.Combine(storage, "dalamudConfig.json"),
             LoggingPath = logs,
             PluginDirectory = Path.Combine(storage, "installedPlugins"),
             AssetDirectory = this.dalamudUpdater.AssetDirectory!.FullName,

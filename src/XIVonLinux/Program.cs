@@ -17,7 +17,7 @@ internal static class Program
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
             .WriteTo.Console()
-            .WriteTo.File(Path.Combine(storage, "xivonlinux.log"))
+            .WriteTo.File(Path.Combine(storage, "logs", "xivonlinux.log"))
             .CreateLogger();
 
         var versionInfo = XIVonLinux.AppUtil.VersionInfo.Instance();

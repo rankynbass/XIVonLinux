@@ -211,7 +211,7 @@ public sealed class LoginService : IDisposable
         Directory.CreateDirectory(gamePath.FullName);
         Directory.CreateDirectory(patchStore.FullName);
 
-        var logFile = storage.GetFile("aria2.log");
+        var logFile = storage.GetFile("logs/aria2.log");
 
         if (acquisition is null)
         {
@@ -292,7 +292,7 @@ public sealed class LoginService : IDisposable
     /// </summary>
     public async Task<bool> DownloadPatchAsync(PatchListEntry patch, DirectoryInfo targetDir, Action<string> status)
     {
-        var logFile = storage.GetFile("aria2.log");
+        var logFile = storage.GetFile("logs/aria2.log");
         acquisition = new AriaPatchAcquisition(logFile);
         await acquisition.StartIfNeededAsync(0); // no speed limit
 
