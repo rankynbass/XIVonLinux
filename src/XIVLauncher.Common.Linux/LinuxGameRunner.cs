@@ -17,12 +17,18 @@ public sealed class LinuxGameRunner : IGameRunner
 
     private readonly UmuPrefix prefix;
     private readonly UmuCommandRunner runner;
+    /// <summary>Extra environment variables merged into every launch, overriding the
+    /// prefix environment. Plain types only (layering rule: the library never references
+    /// app types); the app parses user args into these pairs.</summary>
+    private readonly Dictionary<string, string>? extraEnv;
 
     public LinuxGameRunner(UmuPrefix prefix, string umuRunPath = "/usr/sbin/umu-run",
-        string? wineLogPath = null, string? wineDebug = null)
+        string? wineLogPath = null, string? wineDebug = null,
+        IEnumerable<KeyValuePair<string, string>>? extraEnv = null)
     {
         this.prefix = prefix;
         runner = new UmuCommandRunner(prefix, umuRunPath, wineLogPath, wineDebug);
+        this.extraEnv = extraEnv is null ? null : new Dictionary<string, string>(extraEnv);
     }
 
     public Process? Start(string path, string workingDirectory, string arguments, IDictionary<string, string> environment,
@@ -48,7 +54,16 @@ public sealed class LinuxGameRunner : IGameRunner
                 args.Add(a);
         }
 
-        return runner.RunInPrefix(args, PrefixWorkingDirectory(workingDirectory), environment, false, true);
+        // Merge user extra env vars on top of the launcher-built environment so the
+        // game process sees them as real environment variables.
+        var mergedEnv = environment is null
+            ? new Dictionary<string, string>()
+            : new Dictionary<string, string>(environment);
+        if (extraEnv is not null)
+            foreach (var kv in extraEnv)
+                mergedEnv[kv.Key] = kv.Value;
+
+        return runner.RunInPrefix(args, PrefixWorkingDirectory(workingDirectory), mergedEnv, false, true);
     }
 
     private string PrefixWorkingDirectory(string workingDirectory)

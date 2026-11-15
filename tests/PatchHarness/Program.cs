@@ -5,13 +5,69 @@
 // login with the base version report, then PatchVerifier over all game files.
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using XIVonLinux;
 using XIVLauncher.Common;
+using XIVLauncher.Common.Linux;
 using XIVLauncher.Common.Game;
 using XIVLauncher.Common.Game.Patch;
 using XivGame = XIVLauncher.Common.Game.Launcher;
 
+// Args-field parser check: `parse "<KEY=VALUE ...>"` runs LaunchSettings.ParseArgs on the
+// argument string and prints each pair, so tokenization/quote/validation can be verified.
+if (args.Length > 0 && args[0] == "parse")
+{
+    var input = args.Length > 1 ? args[1] : "";
+    try
+    {
+        var pairs = LaunchSettings.ParseArgs(input);
+        foreach (var (k, v) in pairs)
+            Console.WriteLine($"[{k}]=[{v}]");
+        Console.WriteLine($"parsed {pairs.Count} pair(s)");
+    }
+    catch (FormatException ex)
+    {
+        Console.WriteLine($"ERROR: {ex.Message}");
+    }
+    return;
+}
+
+// E2E env check: `envtest "<KEY=VALUE ...>"` parses the pairs, builds a UmuPrefix from the
+// saved settings, and runs `cmd /c set` inside the prefix with those pairs as environment
+// variables. Prints the captured in-prefix environment so we can see the pairs arrived.
+if (args.Length > 0 && args[0] == "envtest")
+{
+    var s = new SettingsService();
+    var input = args.Length > 1 ? args[1] : "";
+    var pairs = LaunchSettings.ParseArgs(input);
+    var env = new System.Collections.Generic.Dictionary<string, string>();
+    foreach (var (k, v) in pairs)
+        env[k] = v;
+
+    var prefixRoot = s.Settings.PrefixPath;
+    var prefix = new UmuPrefix(
+        new DirectoryInfo(Path.Combine(prefixRoot, "pfx")),
+        prefixRoot,
+        s.Settings.GamePath,
+        "umu-steam",
+        s.Settings.ProtonPath,
+        null, null);
+    var umuRun = $"/home/rankyn/.local/share/xivonlinux/tools/umu/1.4.4/umu-run";
+    var runner = new UmuCommandRunner(prefix, umuRun, null, s.Settings.WineDebugEnv);
+    Console.WriteLine($"prefix: {prefixRoot}  umu: {umuRun}  pairs: {pairs.Count}");
+
+    var proc = runner.RunInPrefix(new[] { "cmd", "/c", "set" }, "", env, true, false);
+    var stdout = proc.StandardOutput.ReadToEnd();
+    proc.WaitForExit();
+    foreach (var (k, v) in pairs)
+    {
+        var found = stdout.Split('\n').Any(line => line.Trim() == $"{k}={v}");
+        Console.WriteLine(found ? $"OK   {k}={v} seen in prefix env"
+                                : $"MISS {k}={v} NOT in prefix env");
+    }
+    return;
+}
 var settings = new SettingsService();
 XIVonLinux.Program.InstallAria2Shim();   // PATH shim + XIVON_* env, same as app startup
 Console.WriteLine($"PATH head: {(Environment.GetEnvironmentVariable("PATH") ?? "").Split(':')[0]}");

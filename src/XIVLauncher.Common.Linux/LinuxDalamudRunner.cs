@@ -40,15 +40,21 @@ public sealed class LinuxDalamudRunner : IDalamudRunner
 {
     private readonly UmuPrefix prefix;
     private readonly UmuCommandRunner runner;
+    /// <summary>Extra environment variables merged into the injector launch (and thus
+    /// inherited by the game it spawns). Plain types only (layering rule: the library
+    /// never references app types); the app parses user args into these pairs.</summary>
+    private readonly Dictionary<string, string>? extraEnv;
     private string capturedUmuOutput = "";
     private string capturedUmuError = "";
     private string gameExeName = "";
 
     public LinuxDalamudRunner(UmuPrefix prefix, string umuRunPath = "/usr/sbin/umu-run",
-        string? wineLogPath = null, string? wineDebug = null)
+        string? wineLogPath = null, string? wineDebug = null,
+        IEnumerable<KeyValuePair<string, string>>? extraEnv = null)
     {
         this.prefix = prefix;
         runner = new UmuCommandRunner(prefix, umuRunPath, wineLogPath, wineDebug);
+        this.extraEnv = extraEnv is null ? null : new Dictionary<string, string>(extraEnv);
         runner.StderrLine += line => capturedUmuError += line;
     }
 
@@ -68,7 +74,16 @@ public sealed class LinuxDalamudRunner : IDalamudRunner
         var args = BuildInjectorArgs(runnerExe, gameExe, gameArgs, environment, dalamudStartInfo, loadMethod,
             fakeLogin, noPlugins, noThirdPlugins, additionalInjectorArgs);
 
-        var proc = runner.RunInPrefix(args, Path.GetDirectoryName(runnerExe.FullName), environment, true, true);
+        // Merge user extra env vars on top of the injector environment; the injector
+        // process inherits them and passes them to the game it spawns.
+        var mergedEnv = environment is null
+            ? new Dictionary<string, string>()
+            : new Dictionary<string, string>(environment);
+        if (extraEnv is not null)
+            foreach (var kv in extraEnv)
+                mergedEnv[kv.Key] = kv.Value;
+
+        var proc = runner.RunInPrefix(args, Path.GetDirectoryName(runnerExe.FullName), mergedEnv, true, true);
 
         // The injector prints its JSON result as soon as the game is launched, then keeps
         // the stream open while it monitors the game. Drain both pipes on background tasks

@@ -1026,16 +1026,18 @@ public partial class MainWindow : Window
     /// in Wine-style prefix path, no injector.</summary>
     private void LaunchPlain(UmuPrefix prefix, LoginService service, DirectoryInfo gamePath, XivGame.LoginResult result, ClientLanguage lang, bool isSteam)
     {
-        var gameRunner = new LinuxGameRunner(prefix, this.umuRunPath, WineLogPath, this.settingsService.Settings.WineDebugEnv);
-        var game = new XivGame(new LinuxSteamStub(), new NullUniqueIdCache(), this.frontierUrl, "en");
-
         var gameSettings = this.settingsService.Settings;
         var userPathWine = prefix.UnixToWinePath(service.GameConfigFolder().FullName);
         var extraArgs = $" UserPath={userPathWine}";
-        if (!string.IsNullOrWhiteSpace(gameSettings.AdditionalArgs))
-            extraArgs += " " + gameSettings.AdditionalArgs;   // regex-split by Launcher.LaunchGame
+        // AdditionalArgs are KEY=VALUE pairs passed as environment variables to the
+        // game process (validated on save, so ParseArgs is safe here).
+        var extraEnv = LaunchSettings.ParseArgs(gameSettings.AdditionalArgs)
+            .Select(p => new KeyValuePair<string, string>(p.key, p.value));
+        Report($"extraEnv pairs: {string.Join(" ", extraEnv.Select(p => $"{p.Key}={p.Value}"))} (from AdditionalArgs='{gameSettings.AdditionalArgs}')");
         var dpi = Enum.TryParse<DpiAwareness>(gameSettings.DpiAwareness, out var parsedDpi) ? parsedDpi : DpiAwareness.Unaware;
         Report("LaunchGame (login session, encrypted args)");
+        var gameRunner = new LinuxGameRunner(prefix, this.umuRunPath, WineLogPath, this.settingsService.Settings.WineDebugEnv, extraEnv);
+        var game = new XivGame(new LinuxSteamStub(), new NullUniqueIdCache(), this.frontierUrl, "en");
         var proc = game.LaunchGame(gameRunner, result.UniqueId ?? string.Empty, result.OauthLogin!.Region,
             result.OauthLogin.MaxExpansion, isSteam, extraArgs, "",
             gamePath, lang, true, dpi);
@@ -1272,7 +1274,12 @@ public partial class MainWindow : Window
             _ => DalamudLoadMethod.DllInject,
         };
         Report($"In-prefix injector: SE login session + {loadMethod} + delay {startInfo.DelayInitializeMs}ms");
-        var runner = new LinuxDalamudRunner(prefix, this.umuRunPath, WineLogPath, this.settingsService.Settings.WineDebugEnv);
+        // AdditionalArgs KEY=VALUE pairs → env vars for the injector, inherited by the
+        // game it spawns (validated on save, so ParseArgs is safe here).
+        var extraEnv = LaunchSettings.ParseArgs(this.settingsService.Settings.AdditionalArgs)
+            .Select(p => new KeyValuePair<string, string>(p.key, p.value));
+        Report($"injector extraEnv pairs: {string.Join(" ", extraEnv.Select(p => $"{p.Key}={p.Value}"))} (from AdditionalArgs='{this.settingsService.Settings.AdditionalArgs}')");
+        var runner = new LinuxDalamudRunner(prefix, this.umuRunPath, WineLogPath, this.settingsService.Settings.WineDebugEnv, extraEnv);
         var proc = runner.Run(injectorExe, false, noPlugins, noThirdPlugins, gameExe, gameArgs, "", env,
             loadMethod, startInfo);
 

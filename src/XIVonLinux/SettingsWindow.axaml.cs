@@ -354,6 +354,18 @@ public partial class SettingsWindow : Window
             return;
         }
 
+        // Args: space-separated KEY=VALUE pairs, passed as environment variables. A bare
+        // KEY (no '=') is invalid — the error names it so the user knows what to fix.
+        try
+        {
+            LaunchSettings.ParseArgs(AdditionalArgsBox.Text);
+        }
+        catch (FormatException ex)
+        {
+            ShowAlert($"Args: {ex.Message}\n\nFormat: space-separated KEY=VALUE pairs.\n" +
+                      "Use KEY=\"VALUE\" for values with spaces, KEY= for an empty value.");
+            return;   // do not persist/close with invalid args
+        }
         settings.AdditionalArgs = AdditionalArgsBox.Text;
         settings.DpiAwareness = DpiCombo.SelectedItem as string ?? "Unaware";
         settings.IgnoreSteam = IgnoreSteamCheck.IsChecked == true;

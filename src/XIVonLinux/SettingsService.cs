@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using Serilog;
@@ -51,6 +52,73 @@ public sealed class LaunchSettings
         : string.IsNullOrWhiteSpace(WineDebugValue) ? DefaultWineDebugValue : WineDebugValue;
 
     public const string DefaultWineDebugValue = "+warn,+overlay,fixme-all";
+
+    /// <summary>Parse AdditionalArgs as a space-separated list of KEY=VALUE pairs. VALUE
+    /// may be double-quoted, single-quoted, or unquoted; KEY= (empty value) is valid,
+    /// treated as "". Spaces are allowed only between pairs and inside quotes. Returns
+    /// the pairs in order. Throws FormatException naming the offending key when a token
+    /// has no '=' (a bare KEY), an unterminated quote, trailing text after a quoted
+    /// value, an empty key, or a key that is not a valid environment-variable name.</summary>
+    public static List<(string key, string value)> ParseArgs(string args)
+    {
+        var pairs = new List<(string, string)>();
+        var i = 0;
+        var n = args.Length;
+        while (i < n)
+        {
+            // Skip whitespace between pairs.
+            while (i < n && char.IsWhiteSpace(args[i])) i++;
+            if (i >= n) break;
+
+            // Key runs up to the first '=' (spaces are never part of a key).
+            var keyStart = i;
+            while (i < n && args[i] != '=' && !char.IsWhiteSpace(args[i])) i++;
+            var key = args.Substring(keyStart, i - keyStart);
+            if (i >= n || args[i] != '=')
+                throw new FormatException($"'{key}' is missing a value — use KEY=VALUE (KEY= means empty).");
+            i++;   // consume '='
+
+            string value;
+            if (i < n && (args[i] == '"' || args[i] == '\''))
+            {
+                var quote = args[i];
+                i++;   // consume opening quote
+                var valueStart = i;
+                while (i < n && args[i] != quote) i++;   // spaces inside quotes are kept
+                if (i >= n)
+                    throw new FormatException($"'{key}' has an unterminated quote in its value.");
+                value = args.Substring(valueStart, i - valueStart);
+                i++;   // consume closing quote
+                // Spaces belong between pairs, so nothing non-space may follow the closing quote.
+                if (i < n && !char.IsWhiteSpace(args[i]))
+                    throw new FormatException($"'{key}' has extra text after its quoted value — spaces are only allowed between KEY=VALUE pairs.");
+            }
+            else
+            {
+                var valueStart = i;
+                while (i < n && !char.IsWhiteSpace(args[i])) i++;   // unquoted value: no spaces
+                value = args.Substring(valueStart, i - valueStart);
+            }
+
+            if (key.Length == 0)
+                throw new FormatException("a KEY=VALUE pair is missing its key.");
+            if (!IsValidEnvKey(key))
+                throw new FormatException($"'{key}' is not a valid environment variable name (letters, digits, underscore; not starting with a digit).");
+            pairs.Add((key, value));
+        }
+        return pairs;
+    }
+
+    /// <summary>Environment-variable name rule: first char letter/underscore, all chars
+    /// letter/digit/underscore.</summary>
+    private static bool IsValidEnvKey(string key)
+    {
+        if (key.Length == 0 || !(char.IsLetter(key[0]) || key[0] == '_'))
+            return false;
+        foreach (var c in key)
+            if (!(char.IsLetterOrDigit(c) || c == '_')) return false;
+        return true;
+    }
 
     // Dalamud tab
     public bool DalamudEnabled { get; set; } = true;
