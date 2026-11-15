@@ -25,7 +25,7 @@ public partial class SettingsWindow
     {
         var client = new HttpClient();
         client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent",
-            "XIVonLinux/0.1 (FFXIV launcher; https://github.com/rankynbass/XIVonLinux)");
+            "XIVonLinux/0.2 (FFXIV launcher; https://github.com/rankynbass/XIVonLinux)");
         return client;
     }
 
