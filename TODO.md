@@ -4,7 +4,7 @@ TODO list for developing XIVonLinux launcher
 
 ## Code cleanup
 * Organize code into folders to make it a bit more organized. May not be necessary. Priority: Low
-* Clean up code to be more readable. No one or two letter variable names, except for incrementers in for loops. Use protonPath or proton_path instead of pp, for example. Priority: Medium
+* [DONE 2026-11-14 22:00 PT via b8452f7] Clean up code to be more readable. No one or two letter variable names, except for incrementers in for loops. Use protonPath or proton_path instead of pp, for example. Priority: Medium
 * [DONE 2026-11-14 15:30 PT] Move Login logic to XIVonLinux instead of XIVLauncher.Common.Linux
 
 ## Settings
