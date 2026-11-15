@@ -2,9 +2,9 @@ namespace XIVonLinux;
 
 /// <summary>A saved login account, persisted as one row in the accounts table of
 /// ~/.xivonlinux/accounts.db (user_name PRIMARY KEY — usernames are unique). The
-/// password is NOT stored on disk (Alex's rule: credentials are never persisted) — it is
-/// held in memory on this object only, populated when the user logs in, and never
-/// written by AccountManager.</summary>
+/// password is persisted only when SavePassword is true, encrypted with the account's
+/// per-user AesKey/AesVector (obfuscation); otherwise it stays in memory only,
+/// populated when the user logs in.</summary>
 public sealed class XivAccount
 {
     public string Id => $"{UserName}-{UseOtp}-{UseSteamServiceAccount}";
@@ -13,8 +13,15 @@ public sealed class XivAccount
 
     public string UserName { get; set; } = string.Empty;
 
-    /// <summary>In-memory only: never written to accounts.toml (credentials rule).</summary>
+    /// <summary>Plain-text password held in memory. When SavePassword is true it is
+    /// persisted to accounts.db encrypted with this account's AesKey/AesVector
+    /// (obfuscation, not security — the key sits beside the ciphertext).</summary>
     public string Password { get; set; } = string.Empty;
+
+    /// <summary>Per-account AES key + IV as hex strings, generated once at account
+    /// registration, stored in accounts.deck; used to encrypt/decrypt Password.</summary>
+    public string AesKey { get; set; } = string.Empty;
+    public string AesVector { get; set; } = string.Empty;
 
     public bool SavePassword { get; set; }
     public bool UseSteamServiceAccount { get; set; }

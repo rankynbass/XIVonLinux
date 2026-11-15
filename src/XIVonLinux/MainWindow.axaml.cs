@@ -201,8 +201,11 @@ public partial class MainWindow : Window
         add.Click += (_, _) =>
         {
             PersistAccount(UsernameBox.Text, PasswordBox.Text, OtpCheck.IsChecked == true,
-                SteamAccountCheck.IsChecked == true, FreeTrialCheck.IsChecked == true, saveAsCurrent: true);
-            Report($"Account '{UsernameBox.Text}' saved (password kept in memory only)");
+                SteamAccountCheck.IsChecked == true, FreeTrialCheck.IsChecked == true,
+                SavePasswordCheck.IsChecked == true, saveAsCurrent: true);
+            Report(SavePasswordCheck.IsChecked == true
+                ? $"Account '{UsernameBox.Text}' saved (password stored encrypted with the account's AES key)"
+                : $"Account '{UsernameBox.Text}' saved (password kept in memory only)");
         };
 
         var remove = new MenuItem { Header = "Remove Current Account" };
@@ -247,6 +250,7 @@ public partial class MainWindow : Window
         SteamAccountCheck.IsChecked = account.UseSteamServiceAccount;
         FreeTrialCheck.IsChecked = account.IsFreeTrial;
         OtpCheck.IsChecked = account.UseOtp;
+        SavePasswordCheck.IsChecked = account.SavePassword;
 
         var s = this.settingsService.Settings;
         s.Username = account.UserName;
@@ -260,10 +264,11 @@ public partial class MainWindow : Window
 
     /// <summary>Unique-username persist (accounts.db, user_name PRIMARY KEY): a login
     /// registers the username once; re-logins with the same username update the stored
-    /// flags (OTP/Steam/trial) instead of adding a second account. Password stays in
-    /// memory only. The OTP is not persisted — it changes every minute.</summary>
+    /// flags (OTP/Steam/trial/save-password) instead of adding a second account. The
+    /// password is encrypted with the account's unique AES key/vector and persisted
+    /// only when savePassword is true; the OTP is not persisted (rotates every minute).</summary>
     private void PersistAccount(string username, string password, bool isOtp, bool isSteam, bool isFreeTrial,
-        bool saveAsCurrent = false)
+        bool savePassword, bool saveAsCurrent = false)
     {
         if (string.IsNullOrEmpty(username))
             return;
@@ -276,7 +281,7 @@ public partial class MainWindow : Window
             existing = new XivAccount(username)
             {
                 Password = password,
-                SavePassword = false,
+                SavePassword = savePassword,
                 UseOtp = isOtp,
                 UseSteamServiceAccount = isSteam,
                 IsFreeTrial = isFreeTrial,
@@ -289,6 +294,7 @@ public partial class MainWindow : Window
             existing.UseOtp = isOtp;
             existing.UseSteamServiceAccount = isSteam;
             existing.IsFreeTrial = isFreeTrial;
+            existing.SavePassword = savePassword;
             this.accounts.UpdateAccountFlags(existing);
         }
 
@@ -328,7 +334,8 @@ public partial class MainWindow : Window
         // PersistAccount before the OAuth request), so pressing Login once registers
         // the account in accounts.toml and the Accounts menu; the Ok-path refreshes
         // the password. The OTP is never persisted (it changes every minute).
-        PersistAccount(s.Username, s.Password, isOtp, s.SteamAccount, s.FreeTrial, saveAsCurrent: true);
+        PersistAccount(s.Username, s.Password, isOtp, s.SteamAccount, s.FreeTrial,
+            SavePasswordCheck.IsChecked == true, saveAsCurrent: true);
 
         // The login pipeline writes every step and every error into the log box;
         // show it now so failures are visible as they happen.
@@ -346,8 +353,11 @@ public partial class MainWindow : Window
             Report("A game is already running — close it before launching another");
             return;
         }
+        // Captured on the UI thread here: the pipeline runs on a background task and
+        // must not touch the checkbox directly.
+        var savePassword = SavePasswordCheck.IsChecked == true;
         LoginButton.IsEnabled = false;
-        _ = Task.Run(() => RunLoginPipelineAsync(withDalamud));
+        _ = Task.Run(() => RunLoginPipelineAsync(withDalamud, savePassword));
     }
 
     /// <summary>Log to Serilog (console/file) and mirror the line into the UI status box.</summary>
@@ -770,7 +780,7 @@ public partial class MainWindow : Window
     /// The WINEPREFIX root comes from settings.PrefixPath (default ~/.xivonlinux),
     /// so prefix, settings and dalamud data all live under ~/.xivonlinux.
     /// </summary>
-    private async Task RunLoginPipelineAsync(bool withDalamud)
+    private async Task RunLoginPipelineAsync(bool withDalamud, bool savePassword)
     {
         LoginService? service = null;
         try
@@ -958,9 +968,11 @@ public partial class MainWindow : Window
             if (result.State == XivGame.LoginState.Ok)
             {
                 // XIVLauncher.Core PersistAccount: merge login into the account store after
-                // a successful login; the password lives in memory. The OTP is not persisted.
+                // a successful login; the password is encrypted and stored only when the
+                // Save-password checkbox was on (flag captured on the UI thread). The OTP
+                // is not persisted.
                 PersistAccount(s.Username, s.Password, !string.IsNullOrEmpty(s.OneTimePassword),
-                    s.SteamAccount, s.FreeTrial, saveAsCurrent: true);
+                    s.SteamAccount, s.FreeTrial, savePassword, saveAsCurrent: true);
             }
 
             switch (result.State)
