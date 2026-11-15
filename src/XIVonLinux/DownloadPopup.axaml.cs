@@ -27,6 +27,7 @@ namespace XIVonLinux;
 public partial class DownloadPopup : Window
 {
     private readonly bool fakeMode;
+    private readonly bool repairMode;
     private DispatcherTimer? timer;
 
     // Fake test simulation state.
@@ -44,11 +45,12 @@ public partial class DownloadPopup : Window
     private readonly List<FakePatch> fakePatches = new();
     private readonly int[] fakeSlotIdx = new int[4];
 
-    public DownloadPopup(string title, bool fakeMode = false)
+    public DownloadPopup(string title, bool fakeMode = false, bool repairMode = false)
     {
         InitializeComponent();
         Title = title;
         this.fakeMode = fakeMode;
+        this.repairMode = repairMode;
 
         if (fakeMode)
         {
@@ -62,9 +64,14 @@ public partial class DownloadPopup : Window
         CancelButton.Click += (_, __) =>
         {
             LoginService.CancelCurrentDownloads();
+            LoginService.CancelCurrentRepair();
             Dispatcher.UIThread.Post(() => ClosePopup());
         };
-        Closing += (_, __) => LoginService.CancelCurrentDownloads();
+        Closing += (_, __) =>
+        {
+            LoginService.CancelCurrentDownloads();
+            LoginService.CancelCurrentRepair();
+        };
 
         timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         timer.Tick += (_, __) => Update();
@@ -83,6 +90,32 @@ public partial class DownloadPopup : Window
 
     private void Update()
     {
+        if (repairMode)
+        {
+            // Repair snapshot from LoginService.RepairAsync's pump (one verifier
+            // task at a time: set/task counters + per-set byte progress, current
+            // file shown with an indeterminate bar — hashing has no byte signal).
+            var snap = LoginService.CurrentRepair;
+            BarsPanel.Children.Clear();
+            if (snap is null)
+            {
+                SummaryText.Text = "Repair finished — see status log";
+                BarsPanel.Children.Add(new TextBlock { Text = "Repair finished", Margin = new Thickness(0, 2, 0, 0) });
+                BarsPanel.Children.Add(new ProgressBar { Minimum = 0, Maximum = 1, Value = 1, Height = 14, Width = 528, Margin = new Thickness(0, 2, 0, 8) });
+                return;
+            }
+
+            SummaryText.Text = $"Repair — set {Math.Min(snap.SetIndex + 1, snap.SetCount)}/{snap.SetCount} · task {Math.Min(snap.TaskIndex + 1, snap.TaskCount)}/{snap.TaskCount} · {snap.State}";
+            BarsPanel.Children.Add(new TextBlock { Text = $"Overall — {FmtBytes(snap.Progress)}/{FmtBytes(snap.Total)}", Margin = new Thickness(0, 2, 0, 0) });
+            BarsPanel.Children.Add(new ProgressBar { Minimum = 0, Maximum = Math.Max(1, snap.Total), Value = snap.Progress, Height = 14, Width = 528, Margin = new Thickness(0, 2, 0, 8) });
+            if (!string.IsNullOrEmpty(snap.CurrentFile))
+            {
+                BarsPanel.Children.Add(new TextBlock { Text = $"{snap.CurrentFile} — checking", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0) });
+                BarsPanel.Children.Add(new ProgressBar { Minimum = 0, Maximum = 1, Value = 0, Height = 8, Width = 400, Margin = new Thickness(0, 2, 0, 2), IsIndeterminate = true });
+            }
+            return;
+        }
+
         List<LoginService.DownloadSlotInfo> rows;
         int done, totalFiles, queued;
         double speed;

@@ -202,6 +202,34 @@ public sealed class LoginService : IDisposable
         CurrentPatcher?.StartCancellation();
     }
 
+    /// <summary>The PatchVerifier currently running a repair (null between repairs);
+    /// the progress popup's Cancel routes to its public Cancel().</summary>
+    private static PatchVerifier? currentRepairVerifier;
+    private static bool repairCancelled;
+
+    /// <summary>Repair progress snapshot for the progress popup (null between repairs
+    /// and after completion). The RepairAsync pump refreshes it every ~500 ms.</summary>
+    public sealed class RepairSlotInfo
+    {
+        public string State = "";   // verifier VerifyState, as text
+        public int SetIndex, SetCount, TaskIndex, TaskCount;
+        public long Progress, Total;
+        public string CurrentFile = "";
+    }
+
+    public static RepairSlotInfo? CurrentRepair { get; private set; }
+
+    /// <summary>Cancel the running repair (verifier Cancel); the RepairAsync pump
+    /// ends and RepairAsync reports the cancelled partial outcome. No-op between repairs.</summary>
+    public static void CancelCurrentRepair()
+    {
+        if (currentRepairVerifier is not null)
+        {
+            repairCancelled = true;
+            _ = currentRepairVerifier.Cancel();
+        }
+    }
+
     public async Task<bool> InstallPatchesAsync(Repository repo, PatchListEntry[] patches, string uid, string gameLocation, string patchFolder, Action<string> status)
     {
         var gamePath = new DirectoryInfo(gameLocation);
@@ -259,6 +287,73 @@ public sealed class LoginService : IDisposable
     {
         return await InstallPatchesAsync(Repository.Ffxiv, loginResult.PendingPatches,
             loginResult.UniqueId ?? string.Empty, gameLocation, this.patchCachePath, status);
+    }
+
+    /// <summary>
+    /// Repair game files (XIVLauncher.Core LoginAction.Repair). loginResult must come
+    /// from LoginAsync with forceBaseVersion: true — the base version report makes the
+    /// server return the FULL patch list (base → latest), which drives the verifier.
+    /// Every game file is hashed against the patch sources; broken files are
+    /// re-downloaded from the patch CDN (plain HttpClient, not aria2, so the speed
+    /// limit does not apply) and reinstalled in place, files not in any list are
+    /// moved to game/repair_recycler. Progress lines go to status. Returns
+    /// (repaired broken-file count, moved-file count); verifier Error state returns
+    /// (-1, 0) with an error line in status.
+    /// </summary>
+    public async Task<(int repaired, int moved)> RepairAsync(Launcher.LoginResult loginResult, string gameLocation, Action<string> status)
+    {
+        using var client = new HttpClient();
+        var gamePath = new DirectoryInfo(gameLocation);
+        using var verify = new PatchVerifier(client, gamePath, new DirectoryInfo(this.patchCachePath),
+            loginResult, TimeSpan.FromMilliseconds(100), loginResult.OauthLogin!.MaxExpansion, false);
+
+        currentRepairVerifier = verify;
+        repairCancelled = false;
+
+        verify.Start();
+
+        // Progress pump: the verifier mutates its state properties on its own worker
+        // task; poll at ~500 ms so the log and the popup show which patch set/task is
+        // in flight. Ends on Done/Error or when CancelCurrentRepair() flips the flag.
+        var pump = Task.Run(async () =>
+        {
+            while (!repairCancelled && verify.State is not (PatchVerifier.VerifyState.Done or PatchVerifier.VerifyState.Error))
+            {
+                CurrentRepair = new RepairSlotInfo
+                {
+                    State = verify.State.ToString(),
+                    SetIndex = verify.PatchSetIndex,
+                    SetCount = verify.PatchSetCount,
+                    TaskIndex = verify.TaskIndex,
+                    TaskCount = verify.TaskCount,
+                    Progress = verify.Progress,
+                    Total = verify.Total,
+                    CurrentFile = verify.CurrentFile,
+                };
+                status($"repair [{verify.State}] set {Math.Min(verify.PatchSetIndex + 1, verify.PatchSetCount)}/{verify.PatchSetCount} task {Math.Min(verify.TaskIndex + 1, verify.TaskCount)}/{verify.TaskCount} {verify.Progress / 1048576} MiB / {verify.Total / 1048576} MiB {verify.CurrentFile}");
+                await Task.Delay(500);
+            }
+        });
+
+        await verify.WaitForCompletion();
+        await pump;
+
+        currentRepairVerifier = null;
+        CurrentRepair = null;
+
+        if (repairCancelled)
+        {
+            status("Repair cancelled from the progress popup");
+            return (-1, 0);   // RepairPipelineAsync skips the completion line on -1
+        }
+
+        if (verify.State == PatchVerifier.VerifyState.Error)
+        {
+            status("Repair verification failed (see launcher log)");
+            return (-1, 0);
+        }
+
+        return (verify.NumBrokenFiles, verify.MovedFiles.Count);
     }
 
     /// <summary>

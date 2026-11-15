@@ -141,6 +141,19 @@ public partial class MainWindow : Window
         RunDalamudUpdaterForBranch();   // fire-and-forget background check/download for the saved branch
 
         StartNewsLoad();
+
+        // Quick test of the repair results popup: XIVON_FAKE_REPAIR shows it at startup
+        // with the given outcome — no login, no verification. "1" = nothing changed;
+        // "2,3" = 2 repaired, 3 removed.
+        this.Opened += (_, __) =>
+        {
+            var fake = Environment.GetEnvironmentVariable("XIVON_FAKE_REPAIR");
+            if (fake is null) return;
+            var parts = fake.Split(',');
+            var rep = parts.Length > 0 && int.TryParse(parts[0], out var r) ? r : 0;
+            var mov = parts.Length > 1 && int.TryParse(parts[1], out var m) ? m : 0;
+            ShowRepairResults(rep, mov);
+        };
     }
 
     // ---------- settings modal ----------
@@ -391,10 +404,13 @@ public partial class MainWindow : Window
         noT.Click += async (_, __) => { if (await PrepareLoginFieldsAsync()) StartPipeline(true, false, true); };
         var noL = new MenuItem { Header = "Patch without launching" };
         noL.Click += async (_, __) => { if (await PrepareLoginFieldsAsync()) StartPipeline(true, false, false, true); };
+        var rep = new MenuItem { Header = "Repair game files" };
+        rep.Click += async (_, __) => { if (await PrepareLoginFieldsAsync()) await RepairPipelineAsync(); };
         menu.Items.Add(noD);
         menu.Items.Add(noP);
         menu.Items.Add(noT);
         menu.Items.Add(noL);
+        menu.Items.Add(rep);
         menu.Open((Control)sender!);
     }
 
@@ -718,9 +734,9 @@ public partial class MainWindow : Window
 
     private DownloadPopup? progressPopup;
 
-    private void OpenProgressPopup(string title, bool fakeMode = false)
+    private void OpenProgressPopup(string title, bool fakeMode = false, bool repairMode = false)
     {
-        progressPopup = new DownloadPopup(title, fakeMode);
+        progressPopup = new DownloadPopup(title, fakeMode, repairMode);
         progressPopup.Show(this);
     }
 
@@ -1037,6 +1053,122 @@ public partial class MainWindow : Window
         }
         else
             Report("Launched ffxiv_dx11.exe via umu (pid not reported)");
+    }
+
+    /// <summary>Repair game files (XIVLauncher.Core LoginAction.Repair shape): login with
+    /// the BASE game version report so the server returns the FULL patch list
+    /// (base → latest), then PatchVerifier hashes every game file against every
+    /// patch source. Broken files are re-downloaded from the CDN and reinstalled
+    /// in place; files in no list go to game/repair_recycler. No prefix bootstrap,
+    /// no launch — repair is a file-integrity operation only.</summary>
+    private async Task RepairPipelineAsync()
+    {
+        var settings = this.settingsService.Settings;
+        var gamePath = new DirectoryInfo(settings.GamePath);
+        var gameExe = new FileInfo(Path.Combine(gamePath.FullName, "game", "ffxiv_dx11.exe"));
+        if (!File.Exists(gameExe.FullName))
+        {
+            Report($"Repair skipped — game is not installed at {gamePath.FullName}");
+            return;
+        }
+
+        // UmuPrefix is pure data; LoginAsync needs it for the session object, so repair
+        // can log in without bootstrapping the prefix at all.
+        var prefixRoot = string.IsNullOrEmpty(settings.PrefixPath)
+            ? this.settingsService.Root.FullName
+            : settings.PrefixPath;
+        var prefix = new UmuPrefix(
+            new DirectoryInfo(Path.Combine(prefixRoot, "pfx")),
+            prefixRoot, gamePath.FullName, "umu-steam",
+            settings.ProtonPath ?? string.Empty, string.Empty, string.Empty);
+
+        var lang = Enum.TryParse<ClientLanguage>(settings.Language, out var parsedLang) ? parsedLang : ClientLanguage.English;
+        var service = new LoginService(this.settingsService.Storage, settings.ConfigPath,
+            this.settingsService.GetCacheFolder("patches").FullName, prefix, lang, this.frontierUrl,
+            settings.MaxDownloadSpeedKibps);
+
+        Report("Repair: checking login gate ...");
+        if (!await service.GateAvailableAsync())
+        {
+            Report("Login servers unreachable or maintenance in progress.");
+            return;
+        }
+
+        Report($"Repair login as {settings.Username} (base version report, steam: {settings.SteamAccount}, free trial: {settings.FreeTrial})");
+        var result = await service.LoginAsync(new LoginRequest { Username = settings.Username, Password = settings.Password, OneTimePassword = settings.OneTimePassword, SteamAccount = settings.SteamAccount, FreeTrial = settings.FreeTrial }, gamePath, forceBaseVersion: true);
+        Report($"Repair login state: {result.State}");
+
+        switch (result.State)
+        {
+            case XivGame.LoginState.NeedsPatchGame:
+                break;
+            case XivGame.LoginState.NoService:
+                Report("No service on this account (no subscription for this region).");
+                return;
+            case XivGame.LoginState.NoTerms:
+                Report("Terms not accepted on this account.");
+                return;
+            case XivGame.LoginState.NeedsPatchBoot:
+                Report("Boot conflict — boot files were modified outside the launcher; a reinstall is required.");
+                return;
+            default:
+                Report($"Repair login state was {result.State}, not NeedsPatchGame — nothing to repair.");
+                return;
+        }
+
+        Report($"Repair: verifying game files against {result.PendingPatches.Length} patch set(s) ...");
+        await Dispatcher.UIThread.InvokeAsync(() => OpenProgressPopup("Repairing game files", false, true));
+        var outcome = await service.RepairAsync(result, settings.GamePath, Report);
+        await Dispatcher.UIThread.InvokeAsync(() => CloseProgressPopup());
+
+        if (outcome.repaired < 0)
+            return; // RepairAsync reported the Error/cancel state already
+
+        Report($"Repair complete: {outcome.repaired} file(s) repaired, {outcome.moved} file(s) moved to repair_recycler");
+        ShowRepairResults(outcome.repaired, outcome.moved);
+    }
+
+    /// <summary>Results popup shown when a repair run finishes (XIVLauncher.Core reports
+    /// repaired/moved counts in its UI). Non-blocking modal on the main window; OK,
+    /// Enter, or the X button all close it.</summary>
+    private void ShowRepairResults(int repaired, int moved)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            var headline = new TextBlock
+            {
+                Text = repaired == 0 && moved == 0
+                    ? "All game files valid — nothing to repair."
+                    : $"Repair finished: {repaired} file(s) repaired, {moved} file(s) removed.",
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(16, 16, 16, 8),
+            };
+            var detail = new TextBlock
+            {
+                Text = $"Files repaired: {repaired}\nFiles removed (moved to game/repair_recycler): {moved}\nAll game files were verified against the server patch list.",
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(16, 0, 16, 8),
+            };
+            var okButton = new Button { Content = "OK", Padding = new Thickness(16, 6), Margin = new Thickness(0, 8, 0, 16), HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, IsDefault = true };
+
+            var panel = new StackPanel();
+            panel.Children.Add(headline);
+            panel.Children.Add(detail);
+            panel.Children.Add(okButton);
+
+            var window = new Window
+            {
+                Title = "Repair Results",
+                Content = panel,
+                Width = 420,
+                Height = 180,
+                CanResize = false,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            };
+
+            okButton.Click += (_, __) => window.Close();
+            window.Show(this);
+        });
     }
 
     /// <summary>Blocks the login pipeline until the background Dalamud updater reaches
