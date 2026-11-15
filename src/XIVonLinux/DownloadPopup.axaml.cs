@@ -36,10 +36,11 @@ public partial class DownloadPopup : Window
         public long Length;
         public long Downloaded;
         public int VerifyTicks;
+        public int InstallTicks;
         public bool Done;
     }
 
-    private const int FakeCount = 40;
+    private const int FakeCount = 20;
     private readonly List<FakePatch> fakePatches = new();
     private readonly int[] fakeSlotIdx = new int[4];
 
@@ -88,6 +89,8 @@ public partial class DownloadPopup : Window
         long totalBytes, downloadedBytes;
 
         var patcher = LoginService.CurrentPatcher;
+        long installedBytes;
+        int installActive;
         if (fakeMode)
         {
             AdvanceFakeProgress();
@@ -95,9 +98,11 @@ public partial class DownloadPopup : Window
             done = fakePatches.Count(p => p.Done);
             totalFiles = FakeCount;
             queued = FakeCount - done - rows.Count;
-            speed = rows.Sum(r => r.SpeedBps) / 1024 / 1024;
+            speed = rows.Where(r => r.State == "downloading").Sum(r => r.SpeedBps) / 1024 / 1024;
             totalBytes = fakePatches.Sum(p => p.Length);
             downloadedBytes = fakePatches.Sum(p => p.Downloaded);
+            installedBytes = fakePatches.Where(p => p.Done).Sum(p => p.Length);
+            installActive = rows.Count(r => r.State == "installing");
         }
         else
         {
@@ -105,10 +110,16 @@ public partial class DownloadPopup : Window
             done = patcher?.Downloads.Count(d => d.State == PatchState.Finished) ?? 0;
             totalFiles = patcher?.Downloads.Count ?? 0;
             queued = rows.Count(r => r.State == "queued");
-            speed = rows.Sum(r => r.SpeedBps) / 1024 / 1024;
+            speed = rows.Where(r => r.State == "downloading").Sum(r => r.SpeedBps) / 1024 / 1024;
             totalBytes = patcher is null ? 0 : patcher.Downloads.Sum(d => d.Patch.Length);
-            downloadedBytes = (patcher?.Downloads.Where(d => d.State == PatchState.Finished).Sum(d => d.Patch.Length) ?? 0)
-                              + rows.Where(r => r.State != "queued").Sum(r => r.Downloaded);
+            // Download phase bytes: fully verified (Downloaded/IsInstalling/Finished)
+            // plus live slot bytes for in-flight downloading/verifying rows.
+            downloadedBytes = (patcher?.Downloads.Where(d => d.State == PatchState.Downloaded
+                                                          || d.State == PatchState.IsInstalling
+                                                          || d.State == PatchState.Finished).Sum(d => d.Patch.Length) ?? 0)
+                              + rows.Where(r => r.State == "downloading" || r.State == "verifying").Sum(r => r.Downloaded);
+            installedBytes = patcher?.Downloads.Where(d => d.State == PatchState.Finished).Sum(d => d.Patch.Length) ?? 0;
+            installActive = rows.Count(r => r.State == "installing");
         }
 
         // All patches done — nothing left to show; close the popup (the login
@@ -123,25 +134,27 @@ public partial class DownloadPopup : Window
         // File bars: min 0, max 4. 1-3 downloading files show that many bars, 4+ show 4.
         var activeBars = rows.Where(r => r.State != "queued").Take(4).ToList();
 
-        SummaryText.Text = $"{done}/{totalFiles} downloaded · {queued} queued · {speed:0.0} MB/s";
+        SummaryText.Text = $"{done}/{totalFiles} complete · {queued} queued · {speed:0.0} MB/s · install {done}/{totalFiles}";
 
         if (fakeMode)
-            Log.Information("Fake tick: bars={Bars} done={Done} queued={Queued} bytes={Bytes}/{Total}",
-                activeBars.Count, done, queued, downloadedBytes, totalBytes);
+            Log.Information("Fake tick: bars={Bars} done={Done} queued={Queued} inst={Inst} bytes={Bytes}/{Total}",
+                activeBars.Count, done, queued, installActive, downloadedBytes + installedBytes, 2 * totalBytes);
 
         BarsPanel.Children.Clear();
 
-        // Overall bar (longest): spans every patch, finished included.
+        // Overall bar (longest): two phases — downloads fill the first half, install
+        // the second, both weighted by patch bytes.
+        var installPhase = installedBytes > 0 || installActive > 0;
         BarsPanel.Children.Add(new TextBlock
         {
-            Text = "Overall",
+            Text = installPhase ? $"Overall — installing ({done}/{totalFiles})" : "Overall — downloading",
             Margin = new Thickness(0, 2, 0, 0),
         });
         BarsPanel.Children.Add(new ProgressBar
         {
             Minimum = 0,
-            Maximum = Math.Max(1, totalBytes),
-            Value = downloadedBytes,
+            Maximum = Math.Max(1, 2 * totalBytes),
+            Value = downloadedBytes + installedBytes,
             Height = 14,
             Width = 528,
             Margin = new Thickness(0, 2, 0, 8),
@@ -149,7 +162,9 @@ public partial class DownloadPopup : Window
 
         foreach (var r in activeBars)
         {
-            var label = r.State == "verifying"
+            var label = r.State == "installing"
+                ? $"{r.VersionId} — installing"
+                : r.State == "verifying"
                 ? $"{r.VersionId} — verifying SHA1 {FmtBytes(r.Downloaded)}/{FmtBytes(r.Total)}"
                 : $"{r.VersionId} — {FmtBytes(r.Downloaded)}/{FmtBytes(r.Total)} at {r.SpeedBps / 1024 / 1024:0.0} MB/s";
             BarsPanel.Children.Add(new TextBlock
@@ -158,7 +173,7 @@ public partial class DownloadPopup : Window
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 4, 0, 0),
             });
-            BarsPanel.Children.Add(new ProgressBar
+            var bar = new ProgressBar
             {
                 Minimum = 0,
                 Maximum = Math.Max(1, r.Total),
@@ -166,7 +181,10 @@ public partial class DownloadPopup : Window
                 Height = 8,
                 Width = 400,
                 Margin = new Thickness(0, 2, 0, 2),
-            });
+            };
+            if (r.State == "installing")
+                bar.IsIndeterminate = true;   // install has no byte progress signal; animate
+            BarsPanel.Children.Add(bar);
         }
     }
 
@@ -185,14 +203,21 @@ public partial class DownloadPopup : Window
             if (idx >= FakeCount)
                 continue;
             var p = fakePatches[idx];
-            if (p.VerifyTicks > 0)
+            if (p.InstallTicks > 0)
             {
-                p.VerifyTicks--;
-                if (p.VerifyTicks == 0)
+                p.InstallTicks--;
+                if (p.InstallTicks == 0)
                 {
                     p.Done = true;
                     fakeSlotIdx[s] += 4;
                 }
+                continue;
+            }
+            if (p.VerifyTicks > 0)
+            {
+                p.VerifyTicks--;
+                if (p.VerifyTicks == 0)
+                    p.InstallTicks = 2;
                 continue;
             }
             p.Downloaded = Math.Min(p.Length, p.Downloaded + (long)SlotSpeed(s));
@@ -215,8 +240,8 @@ public partial class DownloadPopup : Window
                 VersionId = p.VersionId,
                 Total = p.Length,
                 Downloaded = p.Downloaded,
-                SpeedBps = p.VerifyTicks > 0 ? 0 : SlotSpeed(s),
-                State = p.VerifyTicks > 0 ? "verifying" : "downloading",
+                SpeedBps = p.VerifyTicks > 0 ? 0 : p.InstallTicks > 0 ? 0 : SlotSpeed(s),
+                State = p.InstallTicks > 0 ? "installing" : p.VerifyTicks > 0 ? "verifying" : "downloading",
             });
         }
         return rows;

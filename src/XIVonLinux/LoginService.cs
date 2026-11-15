@@ -177,6 +177,11 @@ public sealed class LoginService : IDisposable
         {
             if (d.State == PatchState.Nothing)
                 rows.Add(new DownloadSlotInfo { VersionId = d.Patch.VersionId, Total = d.Patch.Length, Downloaded = 0, SpeedBps = 0, State = "queued" });
+            else if (d.State == PatchState.Downloaded)
+                // Verified, waiting for the sequential installer; counts as queued for install.
+                rows.Add(new DownloadSlotInfo { VersionId = d.Patch.VersionId, Total = d.Patch.Length, Downloaded = 0, SpeedBps = 0, State = "queued" });
+            else if (d.State == PatchState.IsInstalling)
+                rows.Add(new DownloadSlotInfo { VersionId = d.Patch.VersionId, Total = d.Patch.Length, Downloaded = 0, SpeedBps = 0, State = "installing" });
         }
 
         return rows.OrderByDescending(r => r.State == "queued" ? -1 : r.Downloaded).Take(5).ToList();
