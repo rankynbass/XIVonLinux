@@ -44,10 +44,12 @@ public sealed class LinuxDalamudRunner : IDalamudRunner
     private string capturedUmuError = "";
     private string gameExeName = "";
 
-    public LinuxDalamudRunner(UmuPrefix prefix, string umuRunPath = "/usr/sbin/umu-run")
+    public LinuxDalamudRunner(UmuPrefix prefix, string umuRunPath = "/usr/sbin/umu-run",
+        string? wineLogPath = null, string? wineDebug = null)
     {
         this.prefix = prefix;
-        runner = new UmuCommandRunner(prefix, umuRunPath);
+        runner = new UmuCommandRunner(prefix, umuRunPath, wineLogPath, wineDebug);
+        runner.StderrLine += line => capturedUmuError += line;
     }
 
     /// <summary>Raw stdout captured from the injector's umu-run invocation (the injector
@@ -95,7 +97,9 @@ public sealed class LinuxDalamudRunner : IDalamudRunner
             }
             capturedUmuOutput = outCapture.ToString();
         });
-        _ = Task.Run(() => capturedUmuError = proc.StandardError.ReadToEnd());
+        // stderr is drained by the runner's single drain task (into the wine log
+        // file + StderrLine event, subscribed in the constructor); reading
+        // StandardError here would compete for the same pipe.
 
         jsonFound.Wait(TimeSpan.FromSeconds(180));
         var winePid = result?.WinProcessId ?? result?.Pid;

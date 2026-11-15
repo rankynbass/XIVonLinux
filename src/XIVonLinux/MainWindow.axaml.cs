@@ -48,6 +48,14 @@ public partial class MainWindow : Window
     private readonly UmuManager umuManager;
     private string umuRunPath = "/usr/sbin/umu-run";
 
+    /// <summary>File all in-prefix umu-run stderr drains into (STORAGE/logs/wine.log).</summary>
+    private string WineLogPath => Path.Combine(this.settingsService.Root.FullName, "logs", "wine.log");
+
+    /// <summary>WINEDEBUG classes for the launch environment; overrides the
+    /// GE-Proton default (-all) with warnings + DX overlay notices, fixme spam
+    /// suppressed.</summary>
+    private const string WineDebugValue = "+warn,+overlay,fixme-all";
+
     /// <summary>Branch track the updater last ran with; a settings change to a
     /// different track re-runs the updater in the background on close.</summary>
     private string lastBranchTrack = "";
@@ -873,7 +881,7 @@ public partial class MainWindow : Window
             }
 
             Report("Ensuring prefix (create + bootstrap) — first run can take a few minutes");
-            new UmuCommandRunner(prefix, this.umuRunPath).EnsurePrefix();
+            new UmuCommandRunner(prefix, this.umuRunPath, WineLogPath, WineDebugValue).EnsurePrefix();
             File.WriteAllText(umuMarker, umuKey);
             Report("Prefix ready");
 
@@ -1030,7 +1038,7 @@ public partial class MainWindow : Window
     /// in Wine-style prefix path, no injector.</summary>
     private void LaunchPlain(UmuPrefix prefix, LoginService service, DirectoryInfo gamePath, XivGame.LoginResult result, ClientLanguage lang, bool isSteam)
     {
-        var gameRunner = new LinuxGameRunner(prefix, this.umuRunPath);
+        var gameRunner = new LinuxGameRunner(prefix, this.umuRunPath, WineLogPath, WineDebugValue);
         var game = new XivGame(new LinuxSteamStub(), new NullUniqueIdCache(), this.frontierUrl, "en");
 
         var gs = this.settingsService.Settings;
@@ -1160,7 +1168,7 @@ public partial class MainWindow : Window
             _ => DalamudLoadMethod.DllInject,
         };
         Report($"In-prefix injector: SE login session + {loadMethod} + delay {startInfo.DelayInitializeMs}ms");
-        var runner = new LinuxDalamudRunner(prefix, this.umuRunPath);
+        var runner = new LinuxDalamudRunner(prefix, this.umuRunPath, WineLogPath, WineDebugValue);
         var proc = runner.Run(injectorExe, false, false, false, gameExe, gameArgs, "", env,
             loadMethod, startInfo);
 

@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using XIVLauncher.Common.PlatformAbstractions;
 using Serilog;
 
@@ -22,11 +24,24 @@ public sealed class UmuCommandRunner
     /// zipapp umu-run extracted under the app's tools dir. The app passes the path
     /// as a plain value (layering rule: the library never resolves app storage).</summary>
     private readonly string umuRunPath;
+    /// <summary>When set, every launched command's stderr is drained into this file
+    /// (append). Plain path string from the app layer.</summary>
+    private readonly string? wineLogPath;
+    /// <summary>WINEDEBUG value added to the launch environment when set; null leaves
+    /// the Proton/GE default (-all) untouched.</summary>
+    private readonly string? wineDebug;
 
-    public UmuCommandRunner(UmuPrefix prefix, string umuRunPath = DefaultUmuRunPath)
+    /// <summary>Published for every drained stderr line (file drain runs once; extra
+    /// consumers subscribe here instead of competing for the stderr pipe).</summary>
+    public event Action<string>? StderrLine;
+
+    public UmuCommandRunner(UmuPrefix prefix, string umuRunPath = DefaultUmuRunPath,
+        string? wineLogPath = null, string? wineDebug = null)
     {
         this.prefix = prefix;
         this.umuRunPath = string.IsNullOrEmpty(umuRunPath) ? DefaultUmuRunPath : umuRunPath;
+        this.wineLogPath = wineLogPath;
+        this.wineDebug = wineDebug;
     }
 
     /// <summary>Run a command inside the prefix (args are in-prefix, i.e. Windows paths).</summary>
@@ -103,6 +118,8 @@ public sealed class UmuCommandRunner
         psi.WorkingDirectory = string.IsNullOrEmpty(workingDirectory) ? PrefixWorkDir() : workingDirectory;
 
         var merged = prefix.UmuEnvironment();
+        if (wineDebug is not null)
+            merged["WINEDEBUG"] = wineDebug;
         if (environment is not null)
             foreach (var kv in environment)
                 merged[kv.Key] = kv.Value;
@@ -113,8 +130,31 @@ public sealed class UmuCommandRunner
         Log.Verbose("umu-run: {FileName} {Arguments}", psi.FileName, BuildArgLine(psi));
         var p = new Process { StartInfo = psi };
         p.Start();
+        if (writeLog)
+            DrainStderr(p);
         return p;
     }
+
+    /// <summary>Drains the redirected stderr pipe into the log file (append) and
+    /// publishes lines to StderrLine. The drain task owns the pipe, so consumers
+    /// never compete with the file writer; an undrained pipe stalls the child once
+    /// the 64KB buffer fills.</summary>
+    private void DrainStderr(Process p)
+    {
+        _ = Task.Run(() =>
+        {
+            StreamWriter? writer = string.IsNullOrEmpty(wineLogPath)
+                ? null
+                : new StreamWriter(wineLogPath, append: true) { AutoFlush = true };
+            string? line;
+            while ((line = p.StandardError.ReadLine()) is not null)
+            {
+                writer?.WriteLine(line);
+                StderrLine?.Invoke(line);
+            }
+            writer?.Dispose();
+        });
+        }
 
     private string PrefixWorkDir() => Path.Combine(prefix.PrefixDir.FullName, "drive_c");
 

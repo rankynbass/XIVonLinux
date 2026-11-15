@@ -18,10 +18,11 @@ public sealed class LinuxGameRunner : IGameRunner
     private readonly UmuPrefix prefix;
     private readonly UmuCommandRunner runner;
 
-    public LinuxGameRunner(UmuPrefix prefix, string umuRunPath = "/usr/sbin/umu-run")
+    public LinuxGameRunner(UmuPrefix prefix, string umuRunPath = "/usr/sbin/umu-run",
+        string? wineLogPath = null, string? wineDebug = null)
     {
         this.prefix = prefix;
-        runner = new UmuCommandRunner(prefix, umuRunPath);
+        runner = new UmuCommandRunner(prefix, umuRunPath, wineLogPath, wineDebug);
     }
 
     public Process? Start(string path, string workingDirectory, string arguments, IDictionary<string, string> environment,
