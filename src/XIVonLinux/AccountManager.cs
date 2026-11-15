@@ -30,12 +30,20 @@ public sealed class AccountManager
     private readonly SettingsService settings;
 
     /// <summary>The active password backend (keyring, deck, or dummy).</summary>
-    public ISecretProvider SecretProvider { get; }
+    public ISecretProvider SecretProvider { get; private set; }
 
     public AccountManager(SettingsService settings)
     {
         this.settings = settings;
         this.SecretProvider = CreateSecretProvider(settings);
+        Load();
+    }
+
+    /// <summary>Rebuild after accounts.db/accounts.deck were deleted (Reset Settings):
+    /// recreate the secret provider (its schema) and reload the empty account list.</summary>
+    public void Reinit()
+    {
+        this.SecretProvider = CreateSecretProvider(this.settings);
         Load();
     }
 
@@ -153,6 +161,10 @@ public sealed class AccountManager
     private SqliteConnection OpenDb()
     {
         var file = DbFile;
+        // Connection pooling keeps pooled handles keyed by file path; "Reset Settings"
+        // deletes accounts.db, and a pooled connection on the deleted inode would
+        // resurrect the ghost database on the next Open. The reset handler calls
+        // SqliteConnection.ClearAllPools() right after deleting the files.
         var conn = new SqliteConnection($"Data Source={file.FullName}");
         conn.Open();
         using var cmd = conn.CreateCommand();

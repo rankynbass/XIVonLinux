@@ -65,6 +65,10 @@ public partial class MainWindow : Window
         this.lastBranchTrack = settings.BranchTrack;
     }
 
+    /// <summary>Public entry for re-firing the background updater (Clear Dalamud deletes
+    /// the downloaded files after Run has completed; the updater must re-download them).</summary>
+    public void RestartDalamudUpdater() => RunDalamudUpdaterForBranch();
+
     /// <summary>umu-run to invoke, resolved from settings: the managed latest/previous
     /// tag picked in the Proton tab, the custom picked folder's umu-run, falling back
     /// to the newest managed install, then the system binary.</summary>
@@ -162,12 +166,26 @@ public partial class MainWindow : Window
     /// then the main page is refocused.</summary>
     private async void OnSettings(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
     {
-        var dlg = new SettingsWindow(this.settingsService);
+        var dlg = new SettingsWindow(this.settingsService, this.accounts);
         await dlg.ShowDialog(this);
         var settings = this.settingsService.Settings;
         if (settings.BranchTrack != this.lastBranchTrack)
             RunDalamudUpdaterForBranch();   // branch changed: re-fetch in the background
         this.Focus();
+    }
+
+    /// <summary>Reset Settings re-prefill (called by SettingsWindow after Reinit): login
+    /// fields fall back to the reset defaults — username/password cleared, Steam back on,
+    /// trial off, no current account.</summary>
+    public void PrefillFromCurrentAccount()
+    {
+        var settings = this.settingsService.Settings;
+        UsernameBox.Text = settings.Username;
+        PasswordBox.Text = settings.Password;
+        SteamAccountCheck.IsChecked = settings.SteamAccount;
+        FreeTrialCheck.IsChecked = settings.FreeTrial;
+        var saved = this.accounts.CurrentAccount;
+        if (saved is not null) SwitchAccountFields(saved, saveAsCurrent: false);
     }
 
     // ---------- log box visibility ----------
@@ -1183,9 +1201,12 @@ public partial class MainWindow : Window
     /// can retry, matching upstream's "hold for update" gate.</summary>
     private async Task<bool> WaitForDalamudAsync()
     {
-        var deadline = DateTime.UtcNow.AddMinutes(5);
-        var reportedStep = "";
         Report("Checking Dalamud (background updater)...");
+        return await WaitForDalamudCoreAsync(DateTime.UtcNow.AddMinutes(5), "", false);
+    }
+
+    private async Task<bool> WaitForDalamudCoreAsync(DateTime deadline, string reportedStep, bool restarted)
+    {
         while (dalamudUpdater.State != DalamudUpdater.DownloadState.Done)
         {
             if (dalamudUpdater.State == DalamudUpdater.DownloadState.NoIntegrity)
@@ -1206,8 +1227,15 @@ public partial class MainWindow : Window
             }
             await Task.Delay(1000);
         }
+
         if (!dalamudUpdater.Runner.Exists)
         {
+            if (!restarted)
+            {
+                Report($"Dalamud injector missing at {dalamudUpdater.Runner.FullName}; restarting background updater");
+                RunDalamudUpdaterForBranch();
+                return await WaitForDalamudCoreAsync(deadline, reportedStep, restarted: true);
+            }
             Report($"Dalamud injector missing at {dalamudUpdater.Runner.FullName}");
             return false;
         }

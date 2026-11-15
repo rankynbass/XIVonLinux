@@ -236,6 +236,16 @@ public sealed class SettingsService
 
     public LaunchSettings Settings { get; private set; }
 
+    /// <summary>Reset Settings (used by the Troubleshooting tab's Reset Settings button):
+    /// fresh LaunchSettings + ApplyDefaults + a fresh settings.toml write. Callers delete
+    /// accounts.db/accounts.deck and rebuild accounts separately.</summary>
+    public void ResetToDefaults()
+    {
+        this.Settings = new LaunchSettings();
+        ApplyDefaults();
+        Save();
+    }
+
     /// <summary>The data root (~/.local/share/xivonlinux), created on first use.</summary>
     public DirectoryInfo Root => this.storage.Root;
 

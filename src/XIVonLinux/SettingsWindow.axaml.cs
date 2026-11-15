@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Microsoft.Data.Sqlite;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
@@ -13,6 +14,7 @@ namespace XIVonLinux;
 public partial class SettingsWindow : Window
 {
     private readonly SettingsService settingsService;
+    private readonly AccountManager accountManager;
 
     /// <summary>Loaded Kamori branch metadata (index-aligned with BranchCombo entries).</summary>
     private readonly List<DalamudBranchMeta.Branch> branches = new();
@@ -33,11 +35,20 @@ public partial class SettingsWindow : Window
         InitializeComponent();
     }
 
-    /// <summary>Opens prefilled from the shared SettingsService; Save writes back and persists.</summary>
-    public SettingsWindow(SettingsService service) : this()
+    /// <summary>Opens prefilled from the shared SettingsService; Save writes back and persists.
+    /// AccountManager rides along for Reset Settings (accounts.db/deck rebuild + UI reload).</summary>
+    public SettingsWindow(SettingsService service, AccountManager accounts) : this()
     {
         this.settingsService = service;
-        var settings = service.Settings;
+        this.accountManager = accounts;
+        ReloadFromSettings();
+    }
+
+    /// <summary>Reloads every field from the shared SettingsService — at open and after Reset
+    /// Settings. Combos are cleared first so re-loading never duplicates items.</summary>
+    private void ReloadFromSettings()
+    {
+        var settings = this.settingsService.Settings;
         GamePathBox.Text = settings.GamePath;
         ConfigPathBox.Text = settings.ConfigPath;
         PatchPathBox.Text = settings.PatchPath;
@@ -48,6 +59,7 @@ public partial class SettingsWindow : Window
         WineDebugCheck.IsChecked = settings.WineDebugEnabled;
         WineDebugBox.Text = string.IsNullOrWhiteSpace(settings.WineDebugValue) ? LaunchSettings.DefaultWineDebugValue : settings.WineDebugValue;
         WineDebugBox.IsEnabled = WineDebugCheck.IsChecked == true;
+        LanguageCombo.Items.Clear();
         LanguageCombo.Items.Add("English");
         LanguageCombo.Items.Add("Japanese");
         LanguageCombo.Items.Add("German");
@@ -59,6 +71,7 @@ public partial class SettingsWindow : Window
         // XIVLauncher.Core Game tab parity: extra args, DPI awareness, Steam-ignore,
         // XL auth macros, uid cache toggle + reset panel.
         AdditionalArgsBox.Text = settings.AdditionalArgs;
+        DpiCombo.Items.Clear();
         DpiCombo.Items.Add("Aware");
         DpiCombo.Items.Add("Unaware");
         DpiCombo.SelectedItem = settings.DpiAwareness;
@@ -99,6 +112,7 @@ public partial class SettingsWindow : Window
 
         // Dalamud tab (XIVLauncher.Core parity): load method, branch, injection delay,
         // manual injector override. Combo Tags carry the DalamudLoadMethod enum names.
+        LoadMethodCombo.Items.Clear();
         LoadMethodCombo.Items.Add(new ComboBoxItem { Content = "Entrypoint", Tag = "EntryPoint" });
         LoadMethodCombo.Items.Add(new ComboBoxItem { Content = "DLL Injection", Tag = "DllInject" });
         LoadMethodCombo.Items.Add(new ComboBoxItem { Content = "ACL-only fix", Tag = "ACLonly" });
@@ -116,6 +130,7 @@ public partial class SettingsWindow : Window
         // DalamudBranchMetaSettingsEntry (created disabled, populated on fetch).
         // Item Tags carry the branch Track; item 0 is the synthetic Release entry
         // (Track "", i.e. the updater's default release path).
+        BranchCombo.Items.Clear();
         BranchCombo.Items.Add(new ComboBoxItem { Content = "Release", Tag = "" });
         BranchCombo.SelectedIndex = 0;
         if (!string.IsNullOrEmpty(settings.BranchTrack))
@@ -124,6 +139,7 @@ public partial class SettingsWindow : Window
 
         // Proton enumeration (Alex): managed mode picks from the Proton builds found in
         // Steam compatibilitytools.d, steamapps/common, and the app's tools/proton dir.
+        ProtonCombo.Items.Clear();
         foreach (var dir in EnumerateProtonDirs())
             ProtonCombo.Items.Add(dir);
         if (ProtonCombo.Items.Contains(settings.ProtonPath))
@@ -134,6 +150,7 @@ public partial class SettingsWindow : Window
         // Umu enumeration (Alex): managed mode picks the latest/previous managed zipapp
         // installs under ~/.xivonlinux/tools/umu; custom mode is a folder picker for a
         // disk-side folder containing umu-run.
+        UmuCombo.Items.Clear();
         var umuTags = EnumerateUmuTags();
         for (var i = 0; i < umuTags.Count; i++)
             UmuCombo.Items.Add(i == 0 ? $"{umuTags[i]} (latest)" : $"{umuTags[i]} (previous)");
@@ -356,6 +373,201 @@ public partial class SettingsWindow : Window
             Children = { new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap }, okButton },
         };
         popup.ShowDialog(this);
+    }
+
+    /// <summary>Modal Yes/No confirmation on this window. Avalonia ShowDialog is
+    /// non-blocking (returns a Task immediately), so it must be awaited — result is
+    /// only meaningful after the await completes.</summary>
+    private async Task<bool> ShowConfirm(string message)
+    {
+        var popup = new Window
+        {
+            Title = "XIVonLinux",
+            Width = 460,
+            Height = 190,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var result = false;
+        var yesButton = new Button { Content = "Yes", Margin = new Avalonia.Thickness(0, 0, 12, 0) };
+        var noButton = new Button { Content = "No" };
+        yesButton.Click += (_, _) => { result = true; popup.Close(); };
+        noButton.Click += (_, _) => { result = false; popup.Close(); };
+
+        var panel = new StackPanel { Margin = new Avalonia.Thickness(16, 12, 16, 12) };
+        panel.Children.Add(new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap });
+        var row = new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+            Margin = new Avalonia.Thickness(0, 12, 0, 0),
+        };
+        row.Children.Add(yesButton);
+        row.Children.Add(noButton);
+        panel.Children.Add(row);
+
+        popup.Content = panel;
+        await popup.ShowDialog(this);
+        return result;
+    }
+
+    private static void DeleteDir(string path)
+    {
+        if (Directory.Exists(path))
+            Directory.Delete(path, true);
+    }
+
+    private static void DeleteFile(string path)
+    {
+        if (File.Exists(path))
+            File.Delete(path);
+    }
+
+    /// <summary>Clear Prefix: delete the WINEPREFIX root; umu regenerates it on next launch.
+    /// (XIVLauncher.Core's ClearPrefix does the same; the user rule: prefixes break after umu
+    /// major bumps, so this doubles as the documented first move for a launch hang.)</summary>
+    private async void OnClearPrefix(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
+    {
+        var root = this.settingsService.Settings.PrefixPath;
+        if (!await ShowConfirm($"Delete the prefix at\n{root}\n\nIt will be recreated on the next game launch."))
+        {
+            return;
+        }
+        try
+        {
+            DeleteDir(root);
+            ShowAlert("Prefix cleared. It will be recreated on the next game launch.");
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "[BUTTON] Clear Prefix failed");
+            ShowAlert($"Failed to clear prefix: {ex.Message}");
+        }
+    }
+
+    /// <summary>Clear Logs: delete the whole logs folder. Serilog's live file resumes
+    /// on next launch; in-prefix logs (dalamud.boot.log) are recreated by the game launch.</summary>
+    private async void OnClearLogs(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
+    {
+        var logs = Path.Combine(this.settingsService.Root.FullName, "logs");
+        if (!await ShowConfirm($"Delete all log files in\n{logs}"))
+        {
+            return;
+        }
+        try
+        {
+            // Delete the log files, not the folder itself: Serilog's rolling-file sink is
+            // attached to the folder, and deleting the folder ghosts the running app's
+            // logging (writes keep landing on the deleted inode).
+            if (Directory.Exists(logs))
+                foreach (var f in Directory.EnumerateFiles(logs, "*", SearchOption.AllDirectories))
+                    File.Delete(f);
+            ShowAlert("Logs deleted. New log files will be created on next launch.");
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "[BUTTON] Clear Logs failed");
+            ShowAlert($"Failed to clear logs: {ex.Message}");
+        }
+    }
+
+    /// <summary>Clear Dalamud Files: delete dalamud, runtime, dalamudAssets folders plus
+    /// dalamudConfig.json, dalamudUI.ini and dalamudVfs.db (cache copy and the legacy
+    /// data-root copy). The updater redownloads everything on next game launch.</summary>
+    private async void OnClearDalamud(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
+    {
+        var root = this.settingsService.Root.FullName;
+        if (!await ShowConfirm("Delete all Dalamud files (dalamud, runtime, dalamudAssets, dalamudConfig.json, " +
+            "dalamudUI.ini, dalamudVfs.db)?\n\nThey will be redownloaded on the next game launch."))
+        {
+            return;
+        }
+        try
+        {
+            DeleteDir(Path.Combine(root, "dalamud"));
+            DeleteDir(Path.Combine(root, "runtime"));
+            DeleteDir(Path.Combine(root, "dalamudAssets"));
+            DeleteFile(Path.Combine(root, "dalamudConfig.json"));
+            DeleteFile(Path.Combine(root, "dalamudUI.ini"));
+            DeleteFile(Path.Combine(root, "dalamudVfs.db"));
+            DeleteFile(Path.Combine(XdgStorage.CacheRoot, "dalamudVfs.db"));
+            // Recreate the folders empty: the in-prefix Dalamud updater (submodule) calls
+            // Directory.Delete(true) on folders it finds existing; racing against our own
+            // half-deleted trees throws DirectoryNotFoundException. An empty folder makes
+            // its delete-then-create cycle deterministic.
+            Directory.CreateDirectory(Path.Combine(root, "dalamud"));
+            Directory.CreateDirectory(Path.Combine(root, "runtime"));
+            Directory.CreateDirectory(Path.Combine(root, "dalamudAssets"));
+            // The background updater already completed in this session; re-fire it so the
+            // files are re-downloaded without needing an app restart.
+            if (this.Owner is MainWindow mw) mw.RestartDalamudUpdater();
+            ShowAlert("Dalamud files cleared. They will be redownloaded on the next game launch.");
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "[BUTTON] Clear Dalamud failed");
+            ShowAlert($"Failed to clear Dalamud files: {ex.Message}");
+        }
+    }
+
+    /// <summary>Clear Plugins: delete installedPlugins; pluginConfigs is kept (XIVLauncher.Core
+    /// parity — plugin config/settings survive a plugin clear).</summary>
+    private async void OnClearPlugins(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
+    {
+        var plugins = Path.Combine(this.settingsService.Root.FullName, "installedPlugins");
+        if (!await ShowConfirm($"Delete the installedPlugins folder?\n\npluginConfigs is kept."))
+        {
+            return;
+        }
+        try
+        {
+            DeleteDir(plugins);
+            ShowAlert("Plugins cleared. pluginConfigs kept.");
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "[BUTTON] Clear Plugins failed");
+            ShowAlert($"Failed to clear plugins: {ex.Message}");
+        }
+    }
+
+    /// <summary>Reset Settings: back up settings.toml, accounts.db and accounts.deck to
+    /// *.bak, reset settings.toml to factory defaults, rebuild empty accounts.db + accounts.deck,
+    /// and reload every field. The Accounts menu and login prefill rebuild on next use.</summary>
+    private async void OnResetSettings(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
+    {
+        if (!await ShowConfirm("Reset ALL settings to defaults?\n\nsettings.toml, accounts.db and accounts.deck are saved as *.bak\n"
+            + XdgStorage.ConfigRoot + " first."))
+        {
+            return;
+        }
+        try
+        {
+            foreach (var name in new[] { "settings.toml", "accounts.db", "accounts.deck" })
+            {
+                var file = this.settingsService.GetConfigFile(name).FullName;
+                if (File.Exists(file))
+                    File.Copy(file, file + ".bak", true);
+                File.Delete(file);
+            }
+
+            // Kill pooled SQLite handles before recreating: any pooled connection opened
+            // on accounts.db / accounts.deck is keyed to the deleted path; Reinit's Load()
+            // would reuse the ghost on the deleted inode (stale reads, SQLITE_READONLY
+            // writes). ClearAllPools closes them, so the next Open creates the new files.
+            SqliteConnection.ClearAllPools();
+
+            this.settingsService.ResetToDefaults();
+            this.accountManager.Reinit();
+            ReloadFromSettings();
+            if (this.Owner is MainWindow mw) mw.PrefillFromCurrentAccount();
+            ShowAlert("Settings reset. Backups saved as settings.toml.bak, accounts.db.bak, accounts.deck.bak.");
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "[BUTTON] Reset Settings failed");
+            ShowAlert($"Failed to reset settings: {ex.Message}");
+        }
     }
 
     /// <summary>Persist all settings, close the modal; the main window refocuses afterwards.</summary>
