@@ -16,10 +16,10 @@ Changes and additions to Settings window
 * [DONE 2026-11-14 14:00 PT] Make sure that dalamud is obeying the killswitch (disabled for patch days, etc). Priority: Very High
 
 ### Game
-* Add search feature to find the game. Search paths ~/.xlcore/ffxiv, ~/.local/share/Steam/steamapps/common, ~/Games. Allow the user to pick one if multiple are found. Priority: Low
+* [Do Later] Add search feature to find the game. Search paths ~/.xlcore/ffxiv, ~/.local/share/Steam/steamapps/common, ~/Games. Allow the user to pick one if multiple are found. Priority: Low
 * [DONE 2026-11-14 18:03 PT via 8a78b6b] Add features from XIVLauncher.Core Settings->Game tab. Priority: Medium
-* Add UID cache function. Priority: Low
-* Add Auto-login macro. Priority: Low
+* [Do Later] Add UID cache function. Priority: Low
+* [Do Later] Add Auto-login macro. Priority: Low
 * [DONE 2026-11-15 12:20 PT via b1fda3c] Fix the Args field so that it actually passes key=value pairs as environment variables. Priority: Medium
 
 ### Patching
