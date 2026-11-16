@@ -18,18 +18,6 @@ public partial class SettingsWindow
     /// <summary>Loaded Kamori branch metadata (index-aligned with BranchCombo entries).</summary>
     private readonly List<DalamudBranchMeta.Branch> branches = new();
 
-    /// <summary>Kamori needs a User-Agent on every request (shared client convention).</summary>
-    private static readonly HttpClient BranchHttp = CreateBranchClient();
-
-    private static HttpClient CreateBranchClient()
-    {
-        var client = new HttpClient();
-        // Version comes from the csproj via the source generator (AppUtil.VersionInfo).
-        client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent",
-            $"XIVonLinux/{AppUtil.GetAssemblyVersion()} (FFXIV launcher; https://github.com/rankynbass/XIVonLinux)");
-        return client;
-    }
-
     private void DalamudTabLoad()
     {
         var settings = this.settingsService.Settings;
@@ -92,7 +80,7 @@ public partial class SettingsWindow
         IEnumerable<DalamudBranchMeta.Branch> fetched;
         try
         {
-            fetched = await DalamudBranchMeta.FetchBranchesAsync(BranchHttp);
+            fetched = await DalamudBranchMeta.FetchBranchesAsync(Program.HttpClient);
         }
         catch
         {

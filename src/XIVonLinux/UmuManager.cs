@@ -24,9 +24,6 @@ public sealed class UmuManager
     private const string ReleasesApi =
         "https://api.github.com/repos/Open-Wine-Components/umu-launcher/releases?per_page=10";
     private const string SystemUmuRunPath = "/usr/sbin/umu-run";
-    private static readonly string UserAgent =
-        $"XIVonLinux/{AppUtil.GetAssemblyVersion()} (FFXIV launcher; https://github.com/rankynbass/XIVonLinux)";
-
     private readonly SettingsService settings;
     private readonly HttpClient http;
 
@@ -34,9 +31,8 @@ public sealed class UmuManager
     {
         this.settings = settings;
         // GitHub's REST API forbids requests without a User-Agent (403 administrative
-        // rules) — a dedicated client, not the shared app HttpClient.
-        this.http = new HttpClient();
-        this.http.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
+        // rules) — the shared app client carries the app User-Agent.
+        this.http = Program.HttpClient;
     }
 
     /// <summary>~/.xivonlinux/tools/umu — the managed zipapp install root.</summary>

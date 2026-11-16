@@ -1,16 +1,40 @@
 using System;
 using System.IO;
+using System.Net;
+using System.Net.Http;
 using Avalonia;
 using Avalonia.Logging;
 using Serilog;
 using Tomlyn;
 using Tomlyn.Model;
 using Tomlyn.Serialization;
+using XIVLauncher.Common.Http.HappyEyeballs;
 
 namespace XIVonLinux;
 
 public static class Program
 {
+    /// <summary>The app-wide HttpClient: HappyEyeballs ConnectCallback (XIVLauncher.Core
+    /// parity — IPv6/IPv4 connect preference), auto-decompression, redirects, and the app
+    /// User-Agent generated from AppUtil. All XIVonLinux HTTP uses this, and it gets
+    /// passed to XIVLauncher.Common.Linux components (PatchVerifier, DalamudUpdater, ...)
+    /// that need a client.</summary>
+    public static HttpClient HttpClient { get; } = CreateAppHttpClient();
+
+    private static HttpClient CreateAppHttpClient()
+    {
+        var client = new HttpClient(new SocketsHttpHandler
+        {
+            ConnectCallback = new HappyEyeballsCallback().ConnectCallback,
+            AutomaticDecompression = DecompressionMethods.All,
+            AllowAutoRedirect = true,
+            MaxAutomaticRedirections = 4,
+        });
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(
+            $"XIVonLinux/{AppUtil.GetAssemblyVersion()} (FFXIV launcher; https://github.com/rankynbass/XIVonLinux)");
+        return client;
+    }
+
     [STAThread]
     public static void Main(string[] args)
     {

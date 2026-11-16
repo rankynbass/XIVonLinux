@@ -104,7 +104,7 @@ public partial class MainWindow : Window
         // cutoff); enforced at login time, XIVLauncher.Core LauncherApp shape.
         _ = Task.Run(async () =>
         {
-            var config = await XIVonLinux.Net.LauncherClientConfig.GetAsync(NewsHttp);
+            var config = await XIVonLinux.Net.LauncherClientConfig.GetAsync(Program.HttpClient);
             this.frontierUrl = config.frontierUrl;
             this.cutOffBootver = config.cutOffBootver;
             this.flags = config.flags;
@@ -137,7 +137,7 @@ public partial class MainWindow : Window
             menu.Open(AccountsButton);
         };
 
-        this.dalamudUpdater = new DalamudUpdater(NewsHttp,
+        this.dalamudUpdater = new DalamudUpdater(Program.HttpClient,
             this.settingsService.GetFolder("dalamud"),
             this.settingsService.GetFolder("runtime"),
             this.settingsService.GetFolder("dalamudAssets"),
@@ -439,7 +439,6 @@ public partial class MainWindow : Window
     // ---------- news frame ----------
 
     private const int BANNER_TIME_MS = 8000;
-    private static readonly HttpClient NewsHttp = new();
 
     private List<Banner> bannerList = new();
     private Bitmap[] bannerBitmaps = [];
@@ -465,7 +464,7 @@ public partial class MainWindow : Window
                 var bitmaps = new List<Bitmap>();
                 foreach (var banner in banners)
                 {
-                    var bytes = await NewsHttp.GetByteArrayAsync(banner.LsbBanner);
+                    var bytes = await Program.HttpClient.GetByteArrayAsync(banner.LsbBanner);
                     bitmaps.Add(await Dispatcher.UIThread.InvokeAsync(() => new Bitmap(new MemoryStream(bytes))));
                 }
 

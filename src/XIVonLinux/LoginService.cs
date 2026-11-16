@@ -302,7 +302,7 @@ public sealed class LoginService : IDisposable
     /// </summary>
     public async Task<(int repaired, int moved)> RepairAsync(Launcher.LoginResult loginResult, string gameLocation, Action<string> status)
     {
-        using var client = new HttpClient();
+        var client = Program.HttpClient;
         var gamePath = new DirectoryInfo(gameLocation);
         using var verify = new PatchVerifier(client, gamePath, new DirectoryInfo(this.patchCachePath),
             loginResult, TimeSpan.FromMilliseconds(100), loginResult.OauthLogin!.MaxExpansion, false);
