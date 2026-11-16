@@ -24,7 +24,8 @@ public sealed class UmuManager
     private const string ReleasesApi =
         "https://api.github.com/repos/Open-Wine-Components/umu-launcher/releases?per_page=10";
     private const string SystemUmuRunPath = "/usr/sbin/umu-run";
-    private const string UserAgent = "XIVonLinux/0.2 (FFXIV launcher; https://github.com/rankynbass/XIVonLinux)";
+    private static readonly string UserAgent =
+        $"XIVonLinux/{AppUtil.GetAssemblyVersion()} (FFXIV launcher; https://github.com/rankynbass/XIVonLinux)";
 
     private readonly SettingsService settings;
     private readonly HttpClient http;

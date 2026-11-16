@@ -24,8 +24,9 @@ public partial class SettingsWindow
     private static HttpClient CreateBranchClient()
     {
         var client = new HttpClient();
+        // Version comes from the csproj via the source generator (AppUtil.VersionInfo).
         client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent",
-            "XIVonLinux/0.2 (FFXIV launcher; https://github.com/rankynbass/XIVonLinux)");
+            $"XIVonLinux/{AppUtil.GetAssemblyVersion()} (FFXIV launcher; https://github.com/rankynbass/XIVonLinux)");
         return client;
     }
 

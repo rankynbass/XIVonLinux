@@ -1,5 +1,4 @@
 using System.IO.Compression;
-using System.Reflection;
 using System.Text.Json;
 
 using XIVLauncher.Common;
@@ -69,8 +68,8 @@ public static class TspackGenerator
         return new
         {
             when = DateTime.Now.ToString("s"),
-            launcherVersion = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown",
-            launcherGitHash = GetGitShortHash(),
+            launcherVersion = AppUtil.GetAssemblyVersion(),
+            launcherGitHash = AppUtil.GetGitHash() ?? "unknown",
             gamePath = settings.GamePath,
             ffxivVersion = ffxivVer,
             ffxivVersionBackup = ffxivVerBackup,
@@ -101,35 +100,5 @@ public static class TspackGenerator
                 settings.DontUseSystemTz,
             },
         };
-    }
-
-    /// <summary>Short git hash of the checkout the running binary lives in; "unknown"
-    /// when the app is not inside a git working tree.</summary>
-    private static string GetGitShortHash()
-    {
-        try
-        {
-            var dir = new DirectoryInfo(AppContext.BaseDirectory);
-            while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, ".git")))
-                dir = dir.Parent;
-            if (dir is null)
-                return "unknown";
-            var proc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "git",
-                Arguments = $"-C \"{dir.FullName}\" rev-parse --short HEAD",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-            });
-            if (proc is null)
-                return "unknown";
-            var hash = proc.StandardOutput.ReadToEnd().Trim();
-            proc.WaitForExit();
-            return hash.Length == 0 ? "unknown" : hash;
-        }
-        catch (Exception)
-        {
-            return "unknown";
-        }
     }
 }
