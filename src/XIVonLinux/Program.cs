@@ -135,7 +135,15 @@ public static class Program
     }
 
     public static AppBuilder BuildAvaloniaApp()
-        => AppBuilder.Configure<App>()
-            .UsePlatformDetect()
-            .LogToTrace(LogEventLevel.Debug);
+    {
+        // X11 via UsePlatformDetect everywhere; on Linux, opt into the native Wayland
+        // backend (Avalonia.Wayland, 12.1+) when a usable compositor is present —
+        // UseWaylandWithFallback probes it and keeps the X11 backend when Wayland is
+        // unavailable, so the app always starts. Empty/absent WAYLAND_DISPLAY never opts in.
+        var builder = AppBuilder.Configure<App>()
+            .UsePlatformDetect();
+        if (OperatingSystem.IsLinux() && !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY")))
+            builder = builder.UseWaylandWithFallback();
+        return builder.LogToTrace(LogEventLevel.Debug);
+    }
 }
