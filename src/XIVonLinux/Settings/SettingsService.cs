@@ -39,7 +39,7 @@ public sealed class LaunchSettings
     // Proton tab
     public string ProtonPath { get; set; } = "";
     public string PrefixPath { get; set; } = "";      // WINEPREFIX root; prefix dir = {PrefixPath}/pfx
-    public bool ManagedProton { get; set; }           // false = custom folder pick, true = pick from enumerated Proton list
+    public bool ManagedProton { get; set; } = true;      // false = custom folder pick, true = pick from enumerated Proton list
     public bool ManagedUmu { get; set; } = true;      // false = custom umu-run folder pick, true = pick latest/previous managed zipapp
     public string UmuTag { get; set; } = "";          // managed mode: selected tools/umu/<tag>
     public string UmuPath { get; set; } = "";         // custom mode: folder on disk containing umu-run
@@ -446,9 +446,9 @@ public sealed class SettingsService
     {
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
-        if (string.IsNullOrEmpty(this.Settings.ProtonPath))
-            this.Settings.ProtonPath = Path.Combine(home, ".local", "share", "Steam",
-                "compatibilitytools.d", "GE-Proton11-6");
+        // ProtonPath intentionally stays empty by default: there is no safe
+        // auto-seed, launching with an empty path is caught in MainWindow with a
+        // popup telling the user to pick a runner in Settings.
 
         if (string.IsNullOrEmpty(this.Settings.PrefixPath))
             this.Settings.PrefixPath = Path.Combine(this.storage.Root.FullName, "proton_prefix");

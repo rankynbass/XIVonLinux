@@ -640,6 +640,11 @@ public partial class MainWindow : Window
 
     /// <summary>Single-button killswitch message popup (same window shape as ShowInstallConfirmAsync).</summary>
     private async Task ShowKillswitchPopupAsync(string message)
+        => await ShowPopupAsync("Killswitch", message);
+
+    /// <summary>Modal-style warning popup: wrapped message + Close button, centered on
+    /// the main window (killswitch/OTP popup shape reused for all popup alerts).</summary>
+    private async Task ShowPopupAsync(string title, string message)
     {
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
@@ -661,7 +666,7 @@ public partial class MainWindow : Window
 
             var window = new Window
             {
-                Title = "Killswitch",
+                Title = title,
                 Content = panel,
                 Width = 520,
                 Height = 280,
@@ -812,7 +817,14 @@ public partial class MainWindow : Window
             }
 
             var proton = settings.ProtonPath;
-            if (string.IsNullOrEmpty(proton) || !Directory.Exists(proton))
+            if (string.IsNullOrEmpty(proton))
+            {
+                Report("Proton path empty — launch refused.");
+                await ShowPopupAsync("Proton Runner", "No proton runner selected. You must go into settings and choose one. " +
+                    "Use ProtonPlus or protonup-qt to manage proton runners.");
+                return;
+            }
+            if (!Directory.Exists(proton))
             {
                 Report($"Proton path not found: {proton} — pick a Proton (default GE-Proton 11-6) under compatibilitytools.d; umu auto-select would upgrade a GE prefix, so launching is refused.");
                 return;
