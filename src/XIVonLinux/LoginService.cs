@@ -24,10 +24,10 @@ namespace XIVonLinux;
 /// App-layer login + patching service (moved out of XIVLauncher.Common.Linux,
 /// 2026-11-14). Wraps XIVLauncher.Common Launcher (OauthLogin -> RegisterSession ->
 /// LoginResult) and the shared patch pipeline (AriaPatchAcquisition + PatchInstaller +
-/// PatchManager). Steam-account login is not supported yet (LinuxSteamStub is not a
-/// real Steamworks binding — Launcher throws SteamException when isSteam is true), so
-/// login runs with SE credentials only. Credentials are passed in-memory and never
-/// persisted.
+/// PatchManager). Steam-account login runs through the real Steamworks binding
+/// (SteamworksSteam on Facepunch.Steamworks), so login works with SE credentials
+/// and with a Steam account (Steam client running and logged on). Credentials are
+/// passed in-memory and never persisted.
 /// </summary>
 public sealed class LoginService : IDisposable
 {
