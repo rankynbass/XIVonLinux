@@ -45,6 +45,8 @@ public sealed class LaunchSettings
     public string UmuPath { get; set; } = "";         // custom mode: folder on disk containing umu-run
     public bool EnableDxvk { get; set; } = true;       // DXVK preset for WINEDLLOVERRIDES
     public string ExtraWineDllOverrides { get; set; } = ""; // appended after the DXVK preset
+    public bool EnableWayland { get; set; }            // PROTON_ENABLE_WAYLAND=1
+    public int WineSyncMethod { get; set; }            // 0 NTSync (if available), 1 FSync, 2 ESync, 3 Wine Sync (slow)
     public bool WineDebugEnabled { get; set; } = true; // false forces WINEDEBUG=-all
     public string WineDebugValue { get; set; } = DefaultWineDebugValue; // classes when enabled; blank restores default
 
@@ -116,6 +118,30 @@ public sealed class LaunchSettings
 
         if (DontUseSystemTz)
             pairs.Add(new KeyValuePair<string, string>("TZ", string.Empty));
+
+        // Proton tab options (not hacks, but merged through the same launch-env pipeline
+        // so both LinuxGameRunner and LinuxDalamudRunner receive them).
+        if (EnableWayland)
+            pairs.Add(new KeyValuePair<string, string>("PROTON_ENABLE_WAYLAND", "1"));
+
+        switch (WineSyncMethod)
+        {
+            case 0:  // NTSync (if available)
+                pairs.Add(new KeyValuePair<string, string>("PROTON_USE_NTSYNC", "1"));
+                break;
+            case 1:  // FSynch
+                pairs.Add(new KeyValuePair<string, string>("PROTON_NO_NTSYNC", "1"));
+                break;
+            case 2:  // ESync
+                pairs.Add(new KeyValuePair<string, string>("PROTON_NO_NTSYNC", "1"));
+                pairs.Add(new KeyValuePair<string, string>("PROTON_NO_FSYNC", "1"));
+                break;
+            case 3:  // Wine Sync (slow)
+                pairs.Add(new KeyValuePair<string, string>("PROTON_NO_NTSYNC", "1"));
+                pairs.Add(new KeyValuePair<string, string>("PROTON_NO_FSYNC", "1"));
+                pairs.Add(new KeyValuePair<string, string>("PROTON_NO_ESYNC", "1"));
+                break;
+        }
 
         return pairs;
     }
@@ -291,6 +317,8 @@ public sealed class SettingsService
         builder.AppendLine($"umu_path = {TomlString(this.Settings.UmuPath)}");
         builder.AppendLine($"enable_dxvk = {this.Settings.EnableDxvk.ToString().ToLowerInvariant()}");
         builder.AppendLine($"extra_wine_dll_overrides = {TomlString(this.Settings.ExtraWineDllOverrides)}");
+        builder.AppendLine($"enable_wayland = {this.Settings.EnableWayland.ToString().ToLowerInvariant()}");
+        builder.AppendLine($"wine_sync_method = {this.Settings.WineSyncMethod}");
         builder.AppendLine($"wine_debug_enabled = {this.Settings.WineDebugEnabled.ToString().ToLowerInvariant()}");
         builder.AppendLine($"wine_debug_value = {TomlString(this.Settings.WineDebugValue)}");
         builder.AppendLine();
@@ -425,6 +453,8 @@ public sealed class SettingsService
         if (Get(proton, "umu_path", "umu_path") is string umuPath) settings.UmuPath = umuPath;
         settings.EnableDxvk = GetBool(proton, "enable_dxvk", "enable_dxvk", settings.EnableDxvk);
         if (Get(proton, "extra_wine_dll_overrides", "extra_wine_dll_overrides") is string wineDllOverrides) settings.ExtraWineDllOverrides = wineDllOverrides;
+        settings.EnableWayland = GetBool(proton, "enable_wayland", "enable_wayland", settings.EnableWayland);
+        settings.WineSyncMethod = GetInt(proton, "wine_sync_method", settings.WineSyncMethod);
         settings.WineDebugEnabled = GetBool(proton, "wine_debug_enabled", "wine_debug_enabled", settings.WineDebugEnabled);
         if (Get(proton, "wine_debug_value", "wine_debug_value") is string wdv)
             settings.WineDebugValue = string.IsNullOrWhiteSpace(wdv) ? LaunchSettings.DefaultWineDebugValue : wdv;

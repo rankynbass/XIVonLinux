@@ -11,12 +11,28 @@ namespace XIVonLinux.Settings;
 /// load through ProtonTabLoad and save through ProtonTabSave.</summary>
 public partial class SettingsWindow
 {
+    /// <summary>Wine Sync method combo labels; index maps to LaunchSettings.WineSyncMethod.
+    /// Env pairs per selection are produced in HackEnvPairs (shared launch-env pipeline).</summary>
+    private static readonly string[] WineSyncLabels =
+    {
+        "NTSync (if available)",
+        "FSync",
+        "ESync",
+        "Wine Sync (slow)",
+    };
+
     private void ProtonTabLoad()
     {
         var settings = this.settingsService.Settings;
         ProtonPathBox.Text = settings.ProtonPath;
         PrefixPathBox.Text = settings.PrefixPath;
         DxvkCheck.IsChecked = settings.EnableDxvk;
+        WaylandCheck.IsChecked = settings.EnableWayland;
+        WineSyncCombo.Items.Clear();
+        foreach (var label in WineSyncLabels)
+            WineSyncCombo.Items.Add(label);
+        WineSyncCombo.SelectedIndex = settings.WineSyncMethod >= 0 && settings.WineSyncMethod < WineSyncLabels.Length
+            ? settings.WineSyncMethod : 0;
         ExtraWineDllOverridesBox.Text = settings.ExtraWineDllOverrides;
         WineDebugCheck.IsChecked = settings.WineDebugEnabled;
         WineDebugBox.Text = string.IsNullOrWhiteSpace(settings.WineDebugValue)
@@ -65,6 +81,8 @@ public partial class SettingsWindow
         settings.UmuPath = UmuPathBox.Text;            // custom mode: picked folder containing umu-run
         settings.PrefixPath = PrefixPathBox.Text;
         settings.EnableDxvk = DxvkCheck.IsChecked == true;
+        settings.EnableWayland = WaylandCheck.IsChecked == true;
+        settings.WineSyncMethod = WineSyncCombo.SelectedIndex >= 0 ? WineSyncCombo.SelectedIndex : 0;
         settings.ExtraWineDllOverrides = ExtraWineDllOverridesBox.Text;
         settings.WineDebugEnabled = WineDebugCheck.IsChecked == true;
         settings.WineDebugValue = string.IsNullOrWhiteSpace(WineDebugBox.Text)
