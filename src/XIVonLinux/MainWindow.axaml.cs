@@ -538,7 +538,7 @@ public partial class MainWindow : Window
 
     private void AddNewsCaption(string caption)
     {
-        NewsList.Children.Add(new TextBlock { Text = caption, FontWeight = FontWeight.Bold, Margin = new Thickness(0, 6, 0, 2) });
+        NewsList.Children.Add(new TextBlock { Text = caption, FontWeight = FontWeight.Bold, Margin = new Thickness(10, 6, 10, 2) });
     }
 
     private void AddNewsEntry(string title, string url)
@@ -546,7 +546,7 @@ public partial class MainWindow : Window
         // News/Topics entries draw 1pt below the inherited default (12 -> 11), and
         // highlight with the theme accent on mouseover (cleared on exit, falling
         // back to the inherited Foreground).
-        var textBlock = new TextBlock { Text = title, FontSize = 11, TextWrapping = TextWrapping.Wrap, Cursor = new Cursor(StandardCursorType.Hand) };
+        var textBlock = new TextBlock { Text = title, FontSize = 11, TextWrapping = TextWrapping.Wrap, Cursor = new Cursor(StandardCursorType.Hand), Margin = new Thickness(20, 0, 20, 0) };
         var accent = new SolidColorBrush((Color)Avalonia.Application.Current.FindResource("SystemAccentColor"));
         textBlock.PointerEntered += (_, _) => textBlock.Foreground = accent;
         textBlock.PointerExited += (_, _) => textBlock.ClearValue(TextBlock.ForegroundProperty);
