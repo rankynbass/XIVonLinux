@@ -2,18 +2,18 @@
     x:Class="XIVonLinux.Settings.SettingsWindow"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Width="900"
-    Height="500"
-    MinWidth="480"
-    MinHeight="360"
+    Width="960"
+    Height="600"
+    MinWidth="640"
+    MinHeight="400"
     Title="Settings"
     CanResize="True">
-    <DockPanel Margin="10,0,10,10">
+    <DockPanel Margin="20,0,20,20">
 
         <!-- Save at lower right -->
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="12"
                     HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button Content="Save" Name="SaveButton" Click="OnSave" MinWidth="96" />
+            <Button Content="Save" Name="SaveButton" Click="OnSave" MinWidth="96" HorizontalContentAlignment="Center" />
         </StackPanel>
 
         <!-- Tab bar stays fixed at the top; each TabItem's content scrolls on its own
