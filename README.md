@@ -2,18 +2,29 @@
 
 A Linux-native FFXIV launcher targeting the Linux desktop and Steam Deck.
 
-## Goals
+![XIVonLinux Main Page](misc/XoL-MainPage.png)
 
-- Launch FFXIV on Linux using Proton / umu-launcher (no manual Wine config). **DONE**
-- Inject Dalamud for plugin support on the Linux/Proton game prefix. **DONE**
-- Runs natively on the Linux desktop (X11/Wayland) and the Steam Deck (SteamOS). **X11/Wayland, not tested on deck**
+This is very much still a work in progress. It is mostly feature-complete when compared to [XIVLauncher.Core](https://github.com/goatcorp/XIVLauncher.Core), but lacks some polish. It does not use [wine-xiv-git](https://github.com/goatcorp/wine-xiv-git), instead relying on [Umu-launcher](https://github.com/Open-Wine-Components/umu-launcher) and Proton.
 
-## Key components (planned)
+## What works
+Everything you see in the UI should be functional
+* Select a custom proton version, or use one from your steam install. I recommend using ProtonPlus or something similar to manage your proton installs.
+* Enable/disable Dalamud, change the injection method, use a custom injector. It also obeys the global lockdown and killswitch used by XIVLauncher and XIVLauncher.Core
+* Download the game. Repair the game (only repairs damaged/missing files). Update the game. There's no saving patches yet.
+* And obviously, run the game, with or without Dalamud. Steam is supported. The UID cache is also included.
 
-- Launcher UI: **Avalonia** (XAML, X11/Wayland native, dark mode, Steam Deck touch). Eto.Forms rejected as primary: its Linux backend has layout/DPI/dark-mode problems, and it has a terrible file/folder picker control. 
-- Game acquisition / patching (game files, module files, boot). **DONE**
-- Proton prefix management via umu-launcher. **DONE**
-- Dalamud injection path for Proton prefixes. **DONE - with killswitch and various safe modes**
+## What's missing
+* No auto-login or auto-OTP.
+* No launching multiple copies of the game, at least not without using containers or some other exotic tricks.
+* No localization.
+* Currently it just uses the default Avalonia dark theme.
+* No installers yet, just the bare files.
+* Not tested on the steam deck or steam machine, or on bazzite gamemode or anything similar.
+
+## AI Disclaimer
+This is written almost exclusively with local AI, specifically [Strata](https://github.com/Niko1221/Strata) with [Swift 1.5 (Qwen3.8)](https://huggingface.co/ukisai/Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-GGUF), and using the Hermes agent harness. I have been pretty specific about what I want it to do at each step, and I have read the code, and tweaked some of the axaml directly, but it is otherwise all written with AI.
+
+Why haven't I written any code? I have found, as I worked on this project, that directly editing the code confuses the AI to the point of breaking. This may be a limitation of the local model; I haven't tried any of the frontier models.
 
 ## Related projects
 
