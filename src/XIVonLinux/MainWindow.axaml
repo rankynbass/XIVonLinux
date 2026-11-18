@@ -9,10 +9,10 @@
     Title="XIVonLinux">
     <DockPanel Margin="20">
 
-        <!-- Right side: one docked column split vertically into the login frame (top,
-             fills) and the buttons frame (bottom). Docking the whole column to the right
-             keeps the news frame full-height on the left. -->
-        <Grid DockPanel.Dock="Right" RowDefinitions="*,Auto" MinWidth="200" Margin="12,0,0,0">
+        <!-- Left side: one docked column split vertically into the login frame (top,
+             fills) and the buttons frame (bottom). Docking the whole column to the left
+             keeps the news frame full-height on the right. -->
+        <Grid DockPanel.Dock="Left" RowDefinitions="*,Auto" MinWidth="200" Margin="0,0,12,0">
             <Border Grid.Row="0"
                     BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" CornerRadius="4"
                     Padding="10">
@@ -35,14 +35,14 @@
                                  window, same height as the Login button, docked to its right. -->
                             <Button Grid.Column="1" Name="TroubleshootButton" Click="OnTroubleshoot" Width="40" Height="40"
                                     VerticalContentAlignment="Center"
-                                    Margin="8,0,0,0" HorizontalContentAlignment="Center">
+                                    Margin="8,0,0,0" HorizontalContentAlignment="Center" ToolTip.Tip="Extra Login Actions">
                                 <TextBlock FontFamily="avares://XIVonLinux/Resources/fonts/FontAwesome5FreeSolid.otf#Font Awesome 5 Free Solid"
                                            Text="&#xf0d7;" FontSize="20" />
                             </Button>
                         </Grid>
                         <Button Name="AccountsButton" Margin="0,8,0,0" Width="40" Height="40"
                                 VerticalContentAlignment="Center"
-                                HorizontalAlignment="Left" HorizontalContentAlignment="Center">
+                                HorizontalAlignment="Left" HorizontalContentAlignment="Center" ToolTip.Tip="Manage Accounts">
                             <TextBlock FontFamily="avares://XIVonLinux/Resources/fonts/FontAwesome5FreeSolid.otf#Font Awesome 5 Free Solid"
                                        Text="&#xf4fe;" FontSize="18" />
                         </Button>
@@ -53,19 +53,19 @@
                     BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" CornerRadius="4"
                     Padding="6,8">
                 <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
-                    <Button Name="LogToggleButton" Click="OnToggleLog" Padding="12,10" HorizontalContentAlignment="Center">
+                    <Button Name="LogToggleButton" Click="OnToggleLog" Padding="12,10" HorizontalContentAlignment="Center" ToolTip.Tip="Show/Hide Log">
                         <TextBlock Name="LogGlyph" FontFamily="avares://XIVonLinux/Resources/fonts/FontAwesome5FreeSolid.otf#Font Awesome 5 Free Solid"
                                    Text="&#xf022;" FontSize="22" />
                     </Button>
-                    <Button Name="AccountButton" Click="OnOpenAccount" Padding="12,10" HorizontalContentAlignment="Center">
+                    <Button Name="AccountButton" Click="OnOpenAccount" Padding="12,10" HorizontalContentAlignment="Center" ToolTip.Tip="MogStation Account">
                         <TextBlock FontFamily="avares://XIVonLinux/Resources/fonts/FontAwesome5FreeSolid.otf#Font Awesome 5 Free Solid"
                                    Text="&#xf007;" FontSize="22" />
                     </Button>
-                    <Button Name="StatusButton" Click="OnOpenStatus" Padding="12,10" HorizontalContentAlignment="Center">
+                    <Button Name="StatusButton" Click="OnOpenStatus" Padding="12,10" HorizontalContentAlignment="Center" ToolTip.Tip="Is FFXIV Up?">
                         <TextBlock FontFamily="avares://XIVonLinux/Resources/fonts/FontAwesome5FreeSolid.otf#Font Awesome 5 Free Solid"
                                    Text="&#xf0ac;" FontSize="22" />
                     </Button>
-                    <Button Name="SettingsButton" Click="OnSettings" Padding="12,10" HorizontalContentAlignment="Center">
+                    <Button Name="SettingsButton" Click="OnSettings" Padding="12,10" HorizontalContentAlignment="Center" ToolTip.Tip="Settings">
                         <TextBlock FontFamily="avares://XIVonLinux/Resources/fonts/FontAwesome5FreeSolid.otf#Font Awesome 5 Free Solid"
                                    Text="&#xf013;" FontSize="22" />
                     </Button>
@@ -73,9 +73,9 @@
             </Border>
         </Grid>
 
-        <!-- News frame fills the remaining width (news shown while the log is hidden,
-             log box replaces it when shown); headlines scroll when the frame shrinks. -->
-        <Grid MinWidth="180" Margin="0,0,12,0">
+        <!-- News frame fills the remaining width on the right (news shown while the log is
+             hidden, log box replaces it when shown); headlines scroll when the frame shrinks. -->
+        <Grid MinWidth="180">
             <!-- A. News banner + headlines: visible while the log is hidden -->
             <Border Name="NewsPanel"
                     BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" CornerRadius="4">
