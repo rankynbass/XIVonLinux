@@ -27,14 +27,25 @@
                         <CheckBox Content="Steam account" Name="SteamAccountCheck" Margin="5,0,5,0" />
                         <CheckBox Content="Free trial" Name="FreeTrialCheck" Margin="5,0,5,0" />
                         <CheckBox Content="Save password" Name="SavePasswordCheck" Margin="5,0,5,0" />
-                        <Button Content="Login" Name="LoginButton" Click="OnLogin" Margin="0,12,0,0"
-                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
-                        <Grid Margin="0,8,0,0" ColumnDefinitions="*,*" HorizontalAlignment="Stretch">
-                            <Button Grid.Column="0" Content="Options" Name="TroubleshootButton" Click="OnTroubleshoot" Margin="0,0,4,0"
+                        <Grid Margin="0,12,0,0" ColumnDefinitions="*,Auto">
+                            <Button Grid.Column="0" Content="Login" Name="LoginButton" Click="OnLogin" Height="40"
+                                    VerticalContentAlignment="Center"
                                     HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
-                            <Button Grid.Column="1" Content="Accounts" Name="AccountsButton" Margin="4,0,0,0"
-                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                            <!-- Square caret (caret-down f0d7) opening the Settings/troubleshooting
+                                 window, same height as the Login button, docked to its right. -->
+                            <Button Grid.Column="1" Name="TroubleshootButton" Click="OnTroubleshoot" Width="40" Height="40"
+                                    VerticalContentAlignment="Center"
+                                    Margin="8,0,0,0" HorizontalContentAlignment="Center">
+                                <TextBlock FontFamily="avares://XIVonLinux/Resources/fonts/FontAwesome5FreeSolid.otf#Font Awesome 5 Free Solid"
+                                           Text="&#xf0d7;" FontSize="20" />
+                            </Button>
                         </Grid>
+                        <Button Name="AccountsButton" Margin="0,8,0,0" Width="40" Height="40"
+                                VerticalContentAlignment="Center"
+                                HorizontalAlignment="Left" HorizontalContentAlignment="Center">
+                            <TextBlock FontFamily="avares://XIVonLinux/Resources/fonts/FontAwesome5FreeSolid.otf#Font Awesome 5 Free Solid"
+                                       Text="&#xf4fe;" FontSize="18" />
+                        </Button>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
