@@ -46,7 +46,7 @@ public sealed class LoginService : IDisposable
     /// lang, time) fetched from the launcher client config.</summary>
     public LoginService(Storage storage, string configPath, string patchCachePath, UmuPrefix prefix, ClientLanguage language = ClientLanguage.English,
         string frontierUrl = "https://launcher.finalfantasyxiv.com/v740/index.html?rc_lang={0}&time={1}",
-        int maxDownloadSpeedKibps = 0)
+        int maxDownloadSpeedKibps = 0, XIVLauncher.Common.PlatformAbstractions.IUniqueIdCache? uidCache = null)
     {
         this.storage = storage;
         this.configPath = configPath;
@@ -54,7 +54,7 @@ public sealed class LoginService : IDisposable
         this.patchCachePath = patchCachePath;
         this.prefix = prefix;
         this.language = language;
-        this.launcher = new Launcher(new SteamworksSteam(), new NullUniqueIdCache(), frontierUrl, "en");
+        this.launcher = new Launcher(new SteamworksSteam(), uidCache ?? new NullUniqueIdCache(), frontierUrl, "en");
     }
 
     /// <summary>Launch gate/login-server availability (upstream GetGateStatus shape).</summary>
@@ -108,11 +108,11 @@ public sealed class LoginService : IDisposable
         return null;
     }
 
-    public async Task<Launcher.LoginResult> LoginAsync(LoginRequest request, DirectoryInfo gamePath, bool forceBaseVersion = false)
+    public async Task<Launcher.LoginResult> LoginAsync(LoginRequest request, DirectoryInfo gamePath, bool forceBaseVersion = false, bool useCache = false)
     {
         return await launcher.Login(
             request.Username, request.Password, request.OneTimePassword,
-            request.SteamAccount, useCache: false, gamePath, forceBaseVersion,
+            request.SteamAccount, useCache, gamePath, forceBaseVersion,
             request.FreeTrial, language);
     }
 

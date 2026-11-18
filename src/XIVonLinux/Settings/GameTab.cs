@@ -37,7 +37,7 @@ public partial class SettingsWindow
         IgnoreSteamCheck.IsChecked = settings.IgnoreSteam;
         XlAuthCheck.IsChecked = settings.UseXlAuthMacros;
         UidCacheCheck.IsChecked = settings.UseUidCache;
-        UidCachePanel.IsVisible = false;   // UID cache UI hidden until implemented
+        UidCachePanel.IsVisible = settings.UseUidCache;   // reset section shown when enabled (Core parity)
     }
 
     /// <summary>Commits Game tab fields into settings; returns false (alert shown) when
@@ -99,8 +99,7 @@ public partial class SettingsWindow
     {
         if (this.settingsService is null)
             return;
-        this.settingsService.Settings.UidCache = "";
-        this.settingsService.Save();
+        this.settingsService.UidCache.Reset();
         ShowAlert("UID cache cleared. Restart the launcher to take effect.");
     }
 }

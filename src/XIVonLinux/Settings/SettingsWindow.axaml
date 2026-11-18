@@ -57,7 +57,7 @@
 
                     <CheckBox Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="3" Content="Use UID cache"
                               Name="UidCacheCheck" HorizontalAlignment="Left" Margin="0,0,0,6"
-                              IsCheckedChanged="OnUidCacheToggled" IsVisible="False" />
+                              IsCheckedChanged="OnUidCacheToggled" />
 
                     <StackPanel Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="10"
                                 Name="UidCachePanel" IsVisible="False" Margin="0,0,0,6">

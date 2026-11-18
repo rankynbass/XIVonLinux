@@ -376,8 +376,17 @@ public partial class MainWindow : Window
 
         // OTP is a true/false setting; when enabled, a popup prompts for the 6-digit code
         // and the login proceeds only when its Login button is pressed (Cancel aborts).
+        // XIVLauncher.Core MainPage parity: a valid uid cache with the setting enabled skips
+        // the OTP prompt; a valid cache with the setting disabled is reset before prompting.
         var isOtp = OtpCheck.IsChecked == true;
-        if (isOtp)
+        var cacheValid = this.settingsService.UidCache.HasValidCache(settings.Username);
+
+        if (isOtp && cacheValid && !settings.UseUidCache)
+            this.settingsService.UidCache.Reset();
+
+        if (isOtp && settings.UseUidCache && cacheValid)
+            settings.OneTimePassword = "";
+        else if (isOtp)
         {
             var code = await ShowOtpPopupAsync();
             if (code is null)
@@ -464,7 +473,7 @@ public partial class MainWindow : Window
     {
         newsService = new LoginService(settingsService.Storage, settingsService.Settings.ConfigPath,
             settingsService.GetCacheFolder("patches").FullName, null!, ClientLanguage.English, this.frontierUrl,
-            settingsService.Settings.MaxDownloadSpeedKibps);
+            settingsService.Settings.MaxDownloadSpeedKibps, settingsService.UidCache);
         var svc = newsService;
 
         _ = Task.Run(async () =>
@@ -907,7 +916,7 @@ public partial class MainWindow : Window
             var lang = Enum.TryParse<ClientLanguage>(settings.Language, out var parsedLang) ? parsedLang : ClientLanguage.English;
             service = new LoginService(this.settingsService.Storage, this.settingsService.Settings.ConfigPath,
                 this.settingsService.GetCacheFolder("patches").FullName, prefix, lang, this.frontierUrl,
-                this.settingsService.Settings.MaxDownloadSpeedKibps);
+                this.settingsService.Settings.MaxDownloadSpeedKibps, this.settingsService.UidCache);
             Report($"Client language: {lang}");
 
             Report("Checking login gate ...");
@@ -996,7 +1005,8 @@ public partial class MainWindow : Window
             }
 
             Report($"Logging in as {settings.Username} (steam: {settings.SteamAccount}, free trial: {settings.FreeTrial})");
-            var result = await service.LoginAsync(new LoginRequest { Username = settings.Username, Password = settings.Password, OneTimePassword = settings.OneTimePassword, SteamAccount = settings.SteamAccount, FreeTrial = settings.FreeTrial }, gamePath);
+            var result = await service.LoginAsync(new LoginRequest { Username = settings.Username, Password = settings.Password, OneTimePassword = settings.OneTimePassword, SteamAccount = settings.SteamAccount, FreeTrial = settings.FreeTrial }, gamePath,
+                useCache: settings.UseUidCache);
             Report($"Login state: {result.State}");
 
             if (result.State == XivGame.LoginState.Ok)
@@ -1135,7 +1145,7 @@ public partial class MainWindow : Window
         var lang = Enum.TryParse<ClientLanguage>(settings.Language, out var parsedLang) ? parsedLang : ClientLanguage.English;
         var service = new LoginService(this.settingsService.Storage, settings.ConfigPath,
             this.settingsService.GetCacheFolder("patches").FullName, prefix, lang, this.frontierUrl,
-            settings.MaxDownloadSpeedKibps);
+            settings.MaxDownloadSpeedKibps, this.settingsService.UidCache);
 
         Report("Repair: checking login gate ...");
         if (!await service.GateAvailableAsync())

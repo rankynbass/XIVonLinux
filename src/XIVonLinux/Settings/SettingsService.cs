@@ -29,8 +29,7 @@ public sealed class LaunchSettings
     public string DpiAwareness { get; set; } = "Unaware"; // DpiAwareness name: Aware/Unaware
     public bool IgnoreSteam { get; set; }             // never use Steam service-account flags at launch
     public bool UseXlAuthMacros { get; set; }         // XL auth macros (IsOtpServer parity; no server on Linux, UI parity)
-    public bool UseUidCache { get; set; }             // enable the uid cache (XIVLauncher.Core cache is a stub; parity UI)
-    public string UidCache { get; set; } = "";        // cached uid string; Reset button clears it
+    public bool UseUidCache { get; set; }             // enable the uid cache: skip network login when the cache is valid
 
     // Patching tab
     public int MaxDownloadSpeedKibps { get; set; } = 0; // KiB/s, 0 = unlimited; aria2 max-overall-download-limit
@@ -246,6 +245,10 @@ public sealed class SettingsService
     private readonly Storage configStorage;
     private readonly Storage cacheStorage;
 
+    /// <summary>Per-username uid cache file (~/.config/xivonlinux/uidcache.json);
+    /// the Game tab reset button and the login pipeline share this instance.</summary>
+    public XIVonLinux.UniqueIdCache UidCache { get; }
+
     public SettingsService()
     {
         // XDG layout (XdgStorage): data root is the main storage, settings-era
@@ -253,6 +256,7 @@ public sealed class SettingsService
         this.storage = new Storage("xivonlinux", XdgStorage.DataRoot);
         this.configStorage = new Storage("xivonlinux", XdgStorage.ConfigRoot);
         this.cacheStorage = new Storage("xivonlinux", XdgStorage.CacheRoot);
+        this.UidCache = new XIVonLinux.UniqueIdCache(this.configStorage.GetFile("uidcache.json"));
         this.Settings = Load();
         ApplyDefaults();
         // Fresh copy on disk after missing/malformed/quarantined settings (and any
@@ -303,7 +307,6 @@ public sealed class SettingsService
         builder.AppendLine($"additional_args = {TomlString(this.Settings.AdditionalArgs)}");
         builder.AppendLine($"dpi_awareness = {TomlString(this.Settings.DpiAwareness)}");
         builder.AppendLine($"ignore_steam = {this.Settings.IgnoreSteam.ToString().ToLowerInvariant()}");
-        builder.AppendLine($"uid_cache = {TomlString(this.Settings.UidCache)}");
         builder.AppendLine($"use_uid_cache = {this.Settings.UseUidCache.ToString().ToLowerInvariant()}");
         builder.AppendLine($"use_xl_auth_macros = {this.Settings.UseXlAuthMacros.ToString().ToLowerInvariant()}");
         builder.AppendLine();
@@ -441,7 +444,6 @@ public sealed class SettingsService
         if (Get(game, "additional_args", "additional_args") is string additionalArgs) settings.AdditionalArgs = additionalArgs;
         if (Get(game, "dpi_awareness", "dpi_awareness") is string dpi) settings.DpiAwareness = dpi;
         settings.IgnoreSteam = GetBool(game, "ignore_steam", "ignore_steam", settings.IgnoreSteam);
-        if (Get(game, "uid_cache", "uid_cache") is string uidCache) settings.UidCache = uidCache;
         settings.UseUidCache = GetBool(game, "use_uid_cache", "use_uid_cache", settings.UseUidCache);
         settings.UseXlAuthMacros = GetBool(game, "use_xl_auth_macros", "use_xl_auth_macros", settings.UseXlAuthMacros);
 
