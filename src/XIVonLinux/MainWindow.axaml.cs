@@ -165,6 +165,18 @@ public partial class MainWindow : Window
 
     // ---------- settings modal ----------
 
+    /// <summary>XIVLauncher.Core parity: button-bar glyphs open the My Account page and
+    /// the FFXXIV service status page in the browser (Steam Deck: Steam overlay).</summary>
+    private void OnOpenAccount(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
+    {
+        AppUtil.OpenBrowser("https://sqex.to/Msp");
+    }
+
+    private void OnOpenStatus(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
+    {
+        AppUtil.OpenBrowser("https://is.xivup.com/");
+    }
+
     /// <summary>Modal settings window over the main page; Save persists and closes,
     /// then the main page is refocused.</summary>
     private async void OnSettings(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)
@@ -200,7 +212,7 @@ public partial class MainWindow : Window
     {
         StatusLog.IsVisible = show;
         NewsPanel.IsVisible = !show;
-        LogToggleButton.Content = show ? "Hide log" : "Show log";
+        // Glyph-only log button: rectangle-list glyph is fixed (f022).
     }
 
     private void OnToggleLog(object? sender, Avalonia.Interactivity.RoutedEventArgs eventArgs)

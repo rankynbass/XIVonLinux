@@ -42,8 +42,22 @@
                     BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" CornerRadius="4"
                     Padding="6,8">
                 <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
-                    <Button Content="Settings" Name="SettingsButton" Click="OnSettings" />
-                    <Button Content="Show log" Name="LogToggleButton" Click="OnToggleLog" />
+                    <Button Name="LogToggleButton" Click="OnToggleLog" Padding="12,10" HorizontalContentAlignment="Center">
+                        <TextBlock Name="LogGlyph" FontFamily="avares://XIVonLinux/Resources/fonts/FontAwesome5FreeSolid.otf#Font Awesome 5 Free Solid"
+                                   Text="&#xf022;" FontSize="22" />
+                    </Button>
+                    <Button Name="AccountButton" Click="OnOpenAccount" Padding="12,10" HorizontalContentAlignment="Center">
+                        <TextBlock FontFamily="avares://XIVonLinux/Resources/fonts/FontAwesome5FreeSolid.otf#Font Awesome 5 Free Solid"
+                                   Text="&#xf007;" FontSize="22" />
+                    </Button>
+                    <Button Name="StatusButton" Click="OnOpenStatus" Padding="12,10" HorizontalContentAlignment="Center">
+                        <TextBlock FontFamily="avares://XIVonLinux/Resources/fonts/FontAwesome5FreeSolid.otf#Font Awesome 5 Free Solid"
+                                   Text="&#xf0ac;" FontSize="22" />
+                    </Button>
+                    <Button Name="SettingsButton" Click="OnSettings" Padding="12,10" HorizontalContentAlignment="Center">
+                        <TextBlock FontFamily="avares://XIVonLinux/Resources/fonts/FontAwesome5FreeSolid.otf#Font Awesome 5 Free Solid"
+                                   Text="&#xf013;" FontSize="22" />
+                    </Button>
                 </StackPanel>
             </Border>
         </Grid>

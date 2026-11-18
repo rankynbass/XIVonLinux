@@ -13,7 +13,10 @@
         <!-- Save at lower right -->
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="12"
                     HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button Content="Save" Name="SaveButton" Click="OnSave" MinWidth="96" HorizontalContentAlignment="Center" />
+            <Button Name="SaveButton" Click="OnSave" Padding="12,10" HorizontalContentAlignment="Center">
+                <TextBlock FontFamily="avares://XIVonLinux/Resources/fonts/FontAwesome5FreeSolid.otf#Font Awesome 5 Free Solid"
+                           Text="&#xf058;" FontSize="22" />
+            </Button>
         </StackPanel>
 
         <!-- Tab bar stays fixed at the top; each TabItem's content scrolls on its own

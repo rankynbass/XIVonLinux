@@ -44,4 +44,15 @@ public static partial class AppUtil
         var fvi = VersionInfo.Instance().Version;
         return fvi.FileVersion.ToString();
     }
+
+    /// <summary>Opens a URL in the system default browser via xdg-open (XIVLauncher.Core
+    /// AppUtil.OpenBrowser, Linux path only — SteamDeck overlay bits dropped).</summary>
+    public static void OpenBrowser(string url)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo("xdg-open", url)
+        {
+            UseShellExecute = false,
+        };
+        System.Diagnostics.Process.Start(psi);
+    }
 }

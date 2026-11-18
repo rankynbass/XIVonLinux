@@ -25,6 +25,8 @@
         <!-- Launcher font: embedded Noto Sans CJK JP (copied from XIVLauncher.Core Resources),
              served to Avalonia via avares:// under the family name in its name table. -->
         <AvaloniaResource Include="Resources/fonts/NotoSansCJKjp-Regular.otf" />
+        <!-- FontAwesome glyphs for button labels (gear, list, newspaper). -->
+        <AvaloniaResource Include="Resources/fonts/FontAwesome5FreeSolid.otf" />
     </ItemGroup>
 
     <ItemGroup>
