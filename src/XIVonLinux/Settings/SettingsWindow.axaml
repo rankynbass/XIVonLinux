@@ -28,7 +28,7 @@
             <TabItem>
                 <TabItem.Header><TextBlock Text="Game" FontSize="14" /></TabItem.Header>
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,12,0,0">
+                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,12,0,0">
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="GamePath" VerticalAlignment="Center" Margin="0,0,12,6" />
                     <TextBox Grid.Row="0" Grid.Column="1" Name="GamePathBox" Margin="0,0,8,6" />
                     <Button Grid.Row="0" Grid.Column="2" Content="Browse" Name="GameBrowseButton" Click="OnBrowseGame" Margin="0,0,0,6" />
@@ -64,6 +64,9 @@
                         <TextBlock Text="Reset the uid cache; you must then restart the launcher." VerticalAlignment="Center" />
                         <Button Content="Reset UID Cache" Name="ResetUidCacheButton" Click="OnResetUidCache" />
                     </StackPanel>
+
+                    <CheckBox Grid.Row="9" Grid.Column="0" Grid.ColumnSpan="3" Content="Close XIVonLinux on game launch"
+                              Name="CloseOnLaunchCheck" HorizontalAlignment="Left" Margin="0,0,0,6" />
                 </Grid>
                 </ScrollViewer>
             </TabItem>

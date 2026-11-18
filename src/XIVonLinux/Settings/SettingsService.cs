@@ -30,6 +30,7 @@ public sealed class LaunchSettings
     public bool IgnoreSteam { get; set; }             // never use Steam service-account flags at launch
     public bool UseXlAuthMacros { get; set; }         // XL auth macros (IsOtpServer parity; no server on Linux, UI parity)
     public bool UseUidCache { get; set; }             // enable the uid cache: skip network login when the cache is valid
+    public bool CloseOnLaunch { get; set; } = true;   // hide the launcher UI once the game process is found, close when FFXIV terminates
 
     // Patching tab
     public int MaxDownloadSpeedKibps { get; set; } = 0; // KiB/s, 0 = unlimited; aria2 max-overall-download-limit
@@ -308,6 +309,7 @@ public sealed class SettingsService
         builder.AppendLine($"dpi_awareness = {TomlString(this.Settings.DpiAwareness)}");
         builder.AppendLine($"ignore_steam = {this.Settings.IgnoreSteam.ToString().ToLowerInvariant()}");
         builder.AppendLine($"use_uid_cache = {this.Settings.UseUidCache.ToString().ToLowerInvariant()}");
+        builder.AppendLine($"close_on_launch = {this.Settings.CloseOnLaunch.ToString().ToLowerInvariant()}");
         builder.AppendLine($"use_xl_auth_macros = {this.Settings.UseXlAuthMacros.ToString().ToLowerInvariant()}");
         builder.AppendLine();
 
@@ -445,6 +447,7 @@ public sealed class SettingsService
         if (Get(game, "dpi_awareness", "dpi_awareness") is string dpi) settings.DpiAwareness = dpi;
         settings.IgnoreSteam = GetBool(game, "ignore_steam", "ignore_steam", settings.IgnoreSteam);
         settings.UseUidCache = GetBool(game, "use_uid_cache", "use_uid_cache", settings.UseUidCache);
+        settings.CloseOnLaunch = GetBool(game, "close_on_launch", "close_on_launch", settings.CloseOnLaunch);
         settings.UseXlAuthMacros = GetBool(game, "use_xl_auth_macros", "use_xl_auth_macros", settings.UseXlAuthMacros);
 
         if (Get(proton, "proton_path", "proton_path") is string protonPath) settings.ProtonPath = protonPath;

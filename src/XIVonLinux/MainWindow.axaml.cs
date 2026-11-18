@@ -1106,9 +1106,21 @@ public partial class MainWindow : Window
             Report($"Launched ffxiv_dx11.exe via umu (unix pid {proc.Id})");
             _ = Task.Run(() =>
             {
+                // CloseOnLaunch (Game tab): the game process is found — hide the UI now,
+                // close the launcher when FFXIV terminates.
+                if (this.settingsService.Settings.CloseOnLaunch)
+                {
+                    Report("CloseOnLaunch: hiding launcher UI");
+                    Dispatcher.UIThread.Post(() => this.Hide());
+                }
                 proc.WaitForExit();
                 Interlocked.Decrement(ref activeLaunches);
                 Report("game process exited");
+                if (this.settingsService.Settings.CloseOnLaunch)
+                {
+                    Report("CloseOnLaunch: closing launcher");
+                    Dispatcher.UIThread.Post(() => this.Close());
+                }
             });
         }
         else
@@ -1366,9 +1378,21 @@ public partial class MainWindow : Window
         Report($"Game unix pid {proc.Id} (name {proc.ProcessName})");
         _ = Task.Run(() =>
         {
+            // CloseOnLaunch (Game tab): the game process is found — hide the UI now,
+            // close the launcher when FFXIV terminates.
+            if (this.settingsService.Settings.CloseOnLaunch)
+            {
+                Report("CloseOnLaunch: hiding launcher UI");
+                Dispatcher.UIThread.Post(() => this.Hide());
+            }
             proc.WaitForExit();
             Interlocked.Decrement(ref activeLaunches);
             Report("Game exited");
+            if (this.settingsService.Settings.CloseOnLaunch)
+            {
+                Report("CloseOnLaunch: closing launcher");
+                Dispatcher.UIThread.Post(() => this.Close());
+            }
             foreach (var line in runner.CapturedUmuOutput().Split('\n').Take(10))
                 if (line.Trim().Length > 0) Report($"injector stdout: {line}");
         });

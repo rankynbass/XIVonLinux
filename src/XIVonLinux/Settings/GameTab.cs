@@ -38,6 +38,7 @@ public partial class SettingsWindow
         XlAuthCheck.IsChecked = settings.UseXlAuthMacros;
         UidCacheCheck.IsChecked = settings.UseUidCache;
         UidCachePanel.IsVisible = settings.UseUidCache;   // reset section shown when enabled (Core parity)
+        CloseOnLaunchCheck.IsChecked = settings.CloseOnLaunch;
     }
 
     /// <summary>Commits Game tab fields into settings; returns false (alert shown) when
@@ -75,6 +76,7 @@ public partial class SettingsWindow
         settings.IgnoreSteam = IgnoreSteamCheck.IsChecked == true;
         settings.UseXlAuthMacros = XlAuthCheck.IsChecked == true;
         settings.UseUidCache = UidCacheCheck.IsChecked == true;
+        settings.CloseOnLaunch = CloseOnLaunchCheck.IsChecked == true;
         return true;
     }
 
