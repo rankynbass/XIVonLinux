@@ -20,6 +20,17 @@ Everything you see in the UI should be functional
 * Currently it just uses the default Avalonia dark theme.
 * No installers yet, just the bare files.
 * Not tested on the steam deck or steam machine, or on bazzite gamemode or anything similar.
+* It does not currently find your already-downloaded copy of FFXIV. You'll need to point to it manually.
+
+## Warnings for XIVLauncher.Core users
+* **DO NOT UPLOAD TSPACKS TO THE XIVLAUCHER DISCORD**
+* For the moment, use this github repo for reporting issues and asking for help, or direct message me on discord (RankynBass in the XIVLauncher Discord).
+* It does not use `~/.xlcore` for its files. It properly obeys the xdg desktop spec, and uses `~/.config/xivonlinux` for configuration and `~/.local/share/xivonlinux` for data.
+* The default download location for FFXIV will be `~/Games/final-fantasy-xiv`.
+* The default patches directory is `~/.cache/xivonlinux`.
+* You will have to go into settings at least once to select a proton runner, and it does not download one if you don't have any.
+* This is beta software. I don't know what might break. It hasn't done anything alarming for me, but who knows? 
+
 
 ## AI Disclaimer
 This is written almost exclusively with local AI, specifically [Strata](https://github.com/Niko1221/Strata) with [Swift 1.5 (Qwen3.8)](https://huggingface.co/ukisai/Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-GGUF), and using the Hermes agent harness. I have been pretty specific about what I want it to do at each step, and I have read the code, and tweaked some of the axaml directly, but it is otherwise all written with AI.
